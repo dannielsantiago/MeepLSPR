@@ -29,7 +29,7 @@ nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 time_step=0.05           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution =600         # resolution pixels/um (pixels/micrometers)
+resolution =900         # resolution pixels/um (pixels/micrometers)
 decay = 1e-9           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
@@ -152,9 +152,6 @@ straight_refl_data_l = sim.get_flux_data(refl_l)
 straight_refl_data_r = sim.get_flux_data(refl_r)
 
 incident_flux = mp.get_fluxes(refl_b) 
-incident_flux2 = mp.get_fluxes(refl_t) 
-
-
 
 
 '''
@@ -209,11 +206,7 @@ abs_refl_data_r = mp.get_fluxes(arefl_r)
 # save incident power for transmission plane
 
 transmitted_flux = abs_refl_data_b
-transmitted_flux2 = abs_refl_data_t
-
-
-flux_freqsb = mp.get_flux_freqs(arefl_b)
-flux_freqst = mp.get_flux_freqs(arefl_t)
+flux_freqs = mp.get_flux_freqs(arefl_b)
 
 
 
@@ -234,7 +227,7 @@ mat=[]
 
 
 for i in range(0, nfreq):
-    wl = np.append(wl, 1/flux_freqsb[i]) # constructs the x axis wavelength
+    wl = np.append(wl, 1/flux_freqs[i]) # constructs the x axis wavelength
 
     scat_refl_flux = abs(scat_refl_data_t[i] - scat_refl_data_b[i] + scat_refl_data_l[i]- scat_refl_data_r[i])
     scat = np.append(scat, scat_refl_flux/incident_flux[i])
@@ -281,7 +274,7 @@ plt.title('Cross-sections of Silver Nanowire of radius %inm and TM polarisation'
 plt.xlabel("wavelength (um)")
 plt.ylabel("cross-section (nm)")
 plt.legend(loc="upper right")  
-plt.axis([0.24, 0.7, 0, mat[0:,1]*1.2])
+plt.axis([0.24, 0.7, 0, max(mat[0:,1])*1.2])
 plt.grid(True)
 plt.minorticks_on()
 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
