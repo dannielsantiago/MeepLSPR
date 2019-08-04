@@ -1,0 +1,4 @@
+h5ls nanowire-ez.h5
+h5topng -t 43:44 -R -Zc dkbluered -a yarg -A nanowire-eps-000000000.h5 nanowire-ez.h5
+convert nanowire-ez.t*.png ez.gif
+rm *.png
