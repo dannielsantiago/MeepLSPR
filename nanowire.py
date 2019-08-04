@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import _shapes as shapes
 from scipy.signal import find_peaks
 
-import _variables as dat
 import c_wire90 as theoretical
 
 '''
