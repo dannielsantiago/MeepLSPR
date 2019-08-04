@@ -10,8 +10,6 @@ Created on Tue May  7 17:19:54 2019
 import meep as mp
 import numpy as np
 import matplotlib.pyplot as plt
-from meep.materials import Au
-import _materials as lib
 import _shapes as shapes
 from scipy.signal import find_peaks
 
@@ -20,10 +18,10 @@ from scipy.signal import find_peaks
 '''
 ------------------------Parameters of the simulation
 '''
-rad=0.025
-w=0.31                  # wavelength
+rad=shapes.rad
+w=0.4                  # wavelength
 fcen=1/w                # Pulse center frequency
-df = 3                  # pulse width in micrometers
+df = 3.5                  # pulse width in micrometers
 
 axis=mp.Ex              # Axis of direction of the pulse Ex=TM, Hx=TE
 dpml = w                # Width of th pml layers = wavelength
@@ -47,9 +45,9 @@ courant=0.25            # numerical stability, default is 0.5, should be lower i
 
 time_step=0.1           # time step to measure flux
 add_time=10             # additional time until field decays 1e-6
-resolution = 200        # resolution pixels/um (pixels/micrometers)
+resolution = 250        # resolution pixels/um (pixels/micrometers)
 resolutionImages = 200     # resolution pixels/um (pixels/micrometers) to run the images
-decay = 1e-3           # decay limit condition for the field measurement
+decay = 1e-6           # decay limit condition for the field measurement
 
 
 cell = mp.Vector3(sx0, sy0, sz0) 
