@@ -29,7 +29,7 @@ nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 time_step=0.05           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution =900         # resolution pixels/um (pixels/micrometers)
+resolution =250         # resolution pixels/um (pixels/micrometers)
 decay = 1e-9           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
@@ -152,6 +152,8 @@ straight_refl_data_l = sim.get_flux_data(refl_l)
 straight_refl_data_r = sim.get_flux_data(refl_r)
 
 incident_flux = mp.get_fluxes(refl_b) 
+incident_flux2 = mp.get_fluxes(refl_t) 
+
 
 
 '''

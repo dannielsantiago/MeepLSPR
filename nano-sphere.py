@@ -11,7 +11,6 @@ import meep as mp
 import numpy as np
 import matplotlib.pyplot as plt
 import _shapes as shapes
-from scipy.signal import find_peaks
 
 
 
@@ -41,17 +40,17 @@ sc=6*rad                # source center coordinate shift
 sw=sx0                  # source width, needs to be bigger than inner cell to generate only plane-waves
 
 nfreq = 100             # number of frequencies at which to compute flux
-courant=0.25            # numerical stability, default is 0.5, should be lower in case refractive index n<1
+courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 
 time_step=0.1           # time step to measure flux
-add_time=10             # additional time until field decays 1e-6
+add_time=2             # additional time until field decays 1e-6
 resolution = 200        # resolution pixels/um (pixels/micrometers)
 resolutionImages = 200     # resolution pixels/um (pixels/micrometers) to run the images
 decay = 1e-6           # decay limit condition for the field measurement
 
 
 cell = mp.Vector3(sx0, sy0, sz0) 
-monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,mx))
+monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
 monitor2D = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(0,mx,mx))
 
 
@@ -175,10 +174,7 @@ if runData:
     
     refl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
     refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
-    
-    
-    tran = sim.add_flux(fcen,df,nfreq,tran_fr)
-    
+        
     sim.use_output_directory('flux-sph_0')
     sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
             mp.in_volume(monitor, mp.to_appended("ez", mp.at_every(time_step, mp.output_efield_x))),
@@ -194,7 +190,7 @@ if runData:
     straight_refl_data_dw = sim.get_flux_data(refl_dw)
     
     # save incident flux for transmission plane
-    incident_tran_flux = mp.get_fluxes(refl_fr_b)
+    incident_tran_flux = mp.get_fluxes(refl_b)
     
     '''
     ------------------------------------------------
@@ -277,14 +273,10 @@ if runData:
     for i in range(0, nfreq):
         wl = np.append(wl, 1/flux_freqs[i]) # constructs the x axis wavelength
     
-        scat_refl_flux = abs(scat_refl_data_t[i] - scat_refl_data_b[i]) + 
-                         abs(scat_refl_data_l[i] - scat_refl_data_r[i]) + 
-                         abs(scat_refl_data_up[i] - scat_refl_data_dw[i])
+        scat_refl_flux = abs(scat_refl_data_t[i] - scat_refl_data_b[i]) + abs(scat_refl_data_l[i] - scat_refl_data_r[i]) + abs(scat_refl_data_up[i] - scat_refl_data_dw[i])
         scat = np.append(scat, scat_refl_flux/incident_tran_flux[i])
         
-        abs_refl_flux = abs(abs_refl_data_t[i] - abs_refl_data_b[i]) +
-                        abs(abs_refl_data_l[i] - abs_refl_data_r[i]) +
-                        abs(abs_refl_data_up[i] - abs_refl_data_dw[i])
+        abs_refl_flux = abs(abs_refl_data_t[i] - abs_refl_data_b[i]) + abs(abs_refl_data_l[i] - abs_refl_data_r[i]) + abs(abs_refl_data_up[i] - abs_refl_data_dw[i])
         abso = np.append(absoV, abs_refl_flux/incident_tran_flux[i])
         
     
@@ -327,9 +319,9 @@ if runImages:
                         boundary_layers=pml_layers,
                         geometry=geometry,
                         sources=sources,
-                        symmetries=sym,
                         resolution=resolutionImages,
                         Courant=courant)
+    
     #meep.Volume(center=meep.Vector3(0,0,0), size=meep.Vector3(10,0,0)), meep.output_dpwr
     sim.use_output_directory('nanosphere-imgs')
     sim.run(mp.in_volume(monitor2D, mp.at_beginning(mp.output_epsilon)),
