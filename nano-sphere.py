@@ -11,6 +11,7 @@ import meep as mp
 import numpy as np
 import matplotlib.pyplot as plt
 import _shapes as shapes
+from coreShell import c_coreshell
 
 
 
@@ -175,10 +176,9 @@ if runData:
     refl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
     refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
         
-    sim.use_output_directory('flux-sph_0')
-    sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
-            mp.in_volume(monitor, mp.to_appended("ez", mp.at_every(time_step, mp.output_efield_x))),
-            until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+    
+    sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+
     
     # for normalization run, save flux fields data for reflection plane
     straight_refl_data_t = sim.get_flux_data(refl_t)
@@ -277,20 +277,26 @@ if runData:
         scat = np.append(scat, scat_refl_flux/incident_tran_flux[i])
         
         abs_refl_flux = abs(abs_refl_data_t[i] - abs_refl_data_b[i]) + abs(abs_refl_data_l[i] - abs_refl_data_r[i]) + abs(abs_refl_data_up[i] - abs_refl_data_dw[i])
-        abso = np.append(absoV, abs_refl_flux/incident_tran_flux[i])
+        abso = np.append(abso, abs_refl_flux/incident_tran_flux[i])
         
     
     #multily for area of the sides to get the crossection in nm,
     # area=4*rad=100 nm
-    #scat=scat*4*rad*4*rad*1000
-    #abso=abso*4*rad*4*rad*1000
+    scat=scat*rad*rad*10000
+    abso=abso*rad*rad*10000
     ext=scat + abso
     
-    plt.figure
+    plt.figure()
     plt.plot(wl,scat,'ob',label='scatering')
     plt.plot(wl,abso,'sr',label='absorption')
     plt.plot(wl,ext,'^g', label='extinction')
-
+    
+    #Analytical model
+    x=c_coreshell(wl*1000,'Ag','Ag',1,15,10,5)
+    
+    plt.plot(x[0:,0],x[0:,1], '-k',label='Analytical model')
+    plt.plot(x[0:,0],x[0:,2], '-k')
+    plt.plot(x[0:,0],x[0:,3], '-k')
 
     radx=rad*1000
     plt.title('Efficiencies of Silver sphere of radius %inm' %radx)

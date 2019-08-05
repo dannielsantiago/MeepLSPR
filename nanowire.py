@@ -140,10 +140,7 @@ refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
 refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
 refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
 
-sim.use_output_directory('flux-out_0')
-sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
-        mp.in_volume(monitor, mp.to_appended("ex", mp.at_every(time_step, mp.output_efield_x))),
-        until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
 
 # for normalization run, save flux fields data for reflection plane
 straight_refl_data_t = sim.get_flux_data(refl_t)
@@ -188,10 +185,14 @@ sim.load_minus_flux_data(refl_b, straight_refl_data_b)
 sim.load_minus_flux_data(refl_l, straight_refl_data_l)
 sim.load_minus_flux_data(refl_r, straight_refl_data_r)
 
+
 sim.use_output_directory('flux-out_1')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         mp.in_volume(monitor, mp.to_appended("ez", mp.at_every(time_step, mp.output_efield_x))),
         until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+'''
+sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+'''
 
 #save scattered reflected flux from the surfaces
 scat_refl_data_t = mp.get_fluxes(refl_t)
