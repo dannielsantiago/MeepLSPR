@@ -9,10 +9,7 @@ Created on Fri Aug  2 20:27:19 2019
 import numpy as np
 from scipy.special import *
 from LD import LD
-import h5py
-
 import math
-import warnings
 
 def bj(v,x):
     #'besselj(n+0.5,x).*sqrt(pi./x/2)','n','x'
@@ -151,26 +148,5 @@ def c_coreshell(wl,mat_core,mat_shell,Nout,rad_core,rad_shell,v):
    
     return mat
 
-hf = h5py.File('data.h5', 'r')
-wl = hf.get('wl')
-wl = np.array(wl)
-hf.close()
-
-x=c_coreshell(wl*1000,'Ag','Ag',1,15,10,5)
-
-import matplotlib.pyplot as plt
-
-plt.figure()
-plt.plot(x[0:,0],x[0:,1], '-g',label='extintion')
-plt.plot(x[0:,0],x[0:,2], '-b',label='scattering')
-plt.plot(x[0:,0],x[0:,3], '-r',label='absorbtion')
-
-plt.xlabel("wavelength (um)")
-plt.ylabel("Efficiencies")
-#plt.legend(loc="upper right")  
-plt.axis([0.24, 0.7, 0, max(x[0:,1])*1.2])
-plt.grid(True)
-plt.minorticks_on()
-plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
 
     
