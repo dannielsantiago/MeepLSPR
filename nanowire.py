@@ -29,7 +29,7 @@ nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 time_step=0.05           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution =600         # resolution pixels/um (pixels/micrometers)
+resolution =250         # resolution pixels/um (pixels/micrometers)
 decay = 1e-9           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
@@ -140,10 +140,7 @@ refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
 refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
 refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
 
-sim.use_output_directory('flux-out_0')
-sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
-        mp.in_volume(monitor, mp.to_appended("ex", mp.at_every(time_step, mp.output_efield_x))),
-        until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
 
 # for normalization run, save flux fields data for reflection plane
 straight_refl_data_t = sim.get_flux_data(refl_t)
@@ -153,7 +150,6 @@ straight_refl_data_r = sim.get_flux_data(refl_r)
 
 incident_flux = mp.get_fluxes(refl_b) 
 incident_flux2 = mp.get_fluxes(refl_t) 
-
 
 
 
@@ -189,10 +185,14 @@ sim.load_minus_flux_data(refl_b, straight_refl_data_b)
 sim.load_minus_flux_data(refl_l, straight_refl_data_l)
 sim.load_minus_flux_data(refl_r, straight_refl_data_r)
 
+
 sim.use_output_directory('flux-out_1')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         mp.in_volume(monitor, mp.to_appended("ez", mp.at_every(time_step, mp.output_efield_x))),
         until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+'''
+sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+'''
 
 #save scattered reflected flux from the surfaces
 scat_refl_data_t = mp.get_fluxes(refl_t)
@@ -209,11 +209,7 @@ abs_refl_data_r = mp.get_fluxes(arefl_r)
 # save incident power for transmission plane
 
 transmitted_flux = abs_refl_data_b
-transmitted_flux2 = abs_refl_data_t
-
-
-flux_freqsb = mp.get_flux_freqs(arefl_b)
-flux_freqst = mp.get_flux_freqs(arefl_t)
+flux_freqs = mp.get_flux_freqs(arefl_b)
 
 
 
@@ -234,7 +230,7 @@ mat=[]
 
 
 for i in range(0, nfreq):
-    wl = np.append(wl, 1/flux_freqsb[i]) # constructs the x axis wavelength
+    wl = np.append(wl, 1/flux_freqs[i]) # constructs the x axis wavelength
 
     scat_refl_flux = abs(scat_refl_data_t[i] - scat_refl_data_b[i] + scat_refl_data_l[i]- scat_refl_data_r[i])
     scat = np.append(scat, scat_refl_flux/incident_flux[i])
@@ -281,7 +277,7 @@ plt.title('Cross-sections of Silver Nanowire of radius %inm and TM polarisation'
 plt.xlabel("wavelength (um)")
 plt.ylabel("cross-section (nm)")
 plt.legend(loc="upper right")  
-plt.axis([0.24, 0.7, 0, mat[0:,1]*1.2])
+plt.axis([0.24, 0.7, 0, max(mat[0:,1])*1.2])
 plt.grid(True)
 plt.minorticks_on()
 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)

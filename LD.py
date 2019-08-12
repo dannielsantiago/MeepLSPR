@@ -11,7 +11,6 @@ from scipy.special import *
 
 import math
 import warnings
-import _variables as dat
 
 def LD(wl,material):
     '''
