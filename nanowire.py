@@ -15,7 +15,7 @@ w=0.4                  # wavelength
 fcen=1/w                # Pulse center frequency
 df = 3.5                 # pulse frequency width 
 cutoff=5
-axis=mp.Ex              # Axis of direction of the pulse Ex=TM, Hx=TE
+polarisation=mp.Ex      # Axis of direction of the pulse Ex=TM, Hx=TE
 dpml = w                # Width of th pml layers = wavelength
 sx = 14*rad             # Size of inner shell
 sy = 14*rad             # Size of inner shell
@@ -84,7 +84,7 @@ Gaussian
 
 # Defining the sources, the y-axis is inverted so propagation direction is down
 gaussian=mp.Source(mp.GaussianSource(wavelength=w, fwidth=df, cutoff=cutoff),
-                     component=axis,
+                     component=polarisation,
                      center=mp.Vector3(0,-sx,0),
                      size=mp.Vector3(sw,0,0))
 
@@ -135,12 +135,14 @@ sim = mp.Simulation(cell_size=cell,
                     resolution=resolution,
                     Courant=courant)
 
+dft_obj = sim.add_dft_fields([mp.Ex], fcen, fcen, 1, where=monitor)
+
 refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t) 
 refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
 refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
 refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
 
-sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 
 # for normalization run, save flux fields data for reflection plane
 straight_refl_data_t = sim.get_flux_data(refl_t)
@@ -151,6 +153,7 @@ straight_refl_data_r = sim.get_flux_data(refl_r)
 incident_flux = mp.get_fluxes(refl_b) 
 incident_flux2 = mp.get_fluxes(refl_t) 
 
+ex0_data = np.real(sim.get_dft_array(dft_obj, polarisation, 0))
 
 
 '''
@@ -185,13 +188,15 @@ sim.load_minus_flux_data(refl_b, straight_refl_data_b)
 sim.load_minus_flux_data(refl_l, straight_refl_data_l)
 sim.load_minus_flux_data(refl_r, straight_refl_data_r)
 
+# 
+dft_obj = sim.add_dft_fields([polarisation], fcen, fcen, 1, where=monitor)
 
 sim.use_output_directory('flux-out_1')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         mp.in_volume(monitor, mp.to_appended("ez", mp.at_every(time_step, mp.output_efield_x))),
-        until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+        until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 '''
-sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 '''
 
 #save scattered reflected flux from the surfaces
@@ -212,7 +217,8 @@ transmitted_flux = abs_refl_data_b
 flux_freqs = mp.get_flux_freqs(arefl_b)
 
 
-
+eps_data = sim.get_array(vol=monitor, component=mp.Dielectric)
+ex_data = np.real(sim.get_dft_array(dft_obj, polarisation, 0))
 
 '''
 ------------------------------------------------
@@ -256,7 +262,7 @@ ext=scat + abso
 check c_wire90.py for instructions
 ---------------------------------
 '''
-mat=theoretical.C_wire90(wl*1000,'Au',1,shapes.rad*1000,16,'TM')
+mat=theoretical.C_wire90(wl*1000,'Ag',1,shapes.rad*1000,16,'TM')
 
 plt.figure()
 #plt.plot(wl[peaks], ext[peaks], "x")
@@ -267,11 +273,11 @@ plt.plot(wl,ext,'^g', label='extinction')
 plt.plot(mat[0:,0],mat[0:,1], '-k', label='Analytical model')
 plt.plot(mat[0:,0],mat[0:,2], '-k')
 plt.plot(mat[0:,0],mat[0:,3], '-k')
-
+'''
 plt.plot(wl,norm, '-', label='incident pulse', linestyle='--')
 plt.plot(wl,tran, '-', label='transmitted pulse', linestyle='--')
 plt.plot(wl,scatt, '-', label='scatt pulse', linestyle='--')
-
+'''
 radx=rad*1000
 plt.title('Cross-sections of Silver Nanowire of radius %inm and TM polarisation' %radx)
 plt.xlabel("wavelength (um)")
@@ -283,6 +289,37 @@ plt.minorticks_on()
 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
    
          
+y=np.array(ext)[np.newaxis].T
+yref=mat[0:,1]
+
+deltaSignal = abs(y - yref)
+percentageDifference = (deltaSignal/yref)*100 # Percent by element. *100
+plt.figure()  
+plt.plot(wl,percentageDifference, '--r', label='% error')
+#plt.plot(wl,np.ones(len(wl))*meanPctDiff,'r', label='%.2f%% avg error' %meanPctDiff)
+plt.axis([0.24, 0.7, 0, max(percentageDifference)*1.2])  
+plt.grid(True)
+plt.minorticks_on()
+plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+plt.xlabel("wavelength (um)")
+plt.ylabel('% error', color='r')  
+plt.tick_params('y', colors='r')
+#plt.legend(loc="center right")  
+plt.show()
+
+
+plt.figure()
+plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+plt.imshow(ex0_data.transpose(), interpolation='spline36', cmap='jet', alpha=0.9)
+plt.axis('off')
+plt.show()
+
+plt.figure()
+plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+plt.imshow(ex_data.transpose(), interpolation='spline36', cmap='jet', alpha=0.9)
+plt.axis('off')
+plt.show()
+
 
 '''
 
@@ -301,33 +338,15 @@ hf.close()
 
 
 plot error
-     
-y=np.array(ext)[np.newaxis].T
-yref=mat[0:,1]
-
-deltaSignal = abs(y - yref)
-percentageDifference = (deltaSignal/yref)*100 # Percent by element. *100
-plt.figure()  
-#plt.title('% Error between Meep simulation and analythical model')
-plt.axis([0.24, 0.7, 0, max(percentageDifference)*1.2])  
-plt.grid(True)
-plt.minorticks_on()
-plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-plt.xlabel("wavelength (um)")
-#plt.twinx()
-plt.plot(wl,percentageDifference, '--r', label='% error')
-#plt.plot(wl,np.ones(len(wl))*meanPctDiff,'r', label='%.2f%% avg error' %meanPctDiff)
-plt.ylabel('% error', color='r')  
-plt.tick_params('y', colors='r')
-#plt.legend(loc="center right")  
-plt.show()
+  
 eps_data = sim.get_array(center=mp.Vector3(), size=mp.Vector3(mx,mx,0), component=mp.Dielectric)
 ez_data = sim.get_array(center=mp.Vector3(), size=mp.Vector3(mx,mx,0), component=mp.Ez)
 plt.figure()
 plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
 plt.imshow(ez_data.transpose(), interpolation='spline36', cmap='RdBu', alpha=0.9)
 plt.axis('off')
-plt.show()
+plt.show()   
+
 '''
 
 '''
