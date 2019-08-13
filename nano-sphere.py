@@ -11,7 +11,7 @@ import meep as mp
 import numpy as np
 import matplotlib.pyplot as plt
 import _shapes as shapes
-from scipy.signal import find_peaks
+from coreShell import c_coreshell
 
 
 
@@ -41,30 +41,24 @@ sc=6*rad                # source center coordinate shift
 sw=sx0                  # source width, needs to be bigger than inner cell to generate only plane-waves
 
 nfreq = 100             # number of frequencies at which to compute flux
-courant=0.25            # numerical stability, default is 0.5, should be lower in case refractive index n<1
+courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 
 time_step=0.1           # time step to measure flux
-add_time=10             # additional time until field decays 1e-6
+add_time=2             # additional time until field decays 1e-6
 resolution = 250        # resolution pixels/um (pixels/micrometers)
-resolutionImages = 200     # resolution pixels/um (pixels/micrometers) to run the images
-decay = 1e-6           # decay limit condition for the field measurement
+decay = 1e-9           # decay limit condition for the field measurement
 
 
 cell = mp.Vector3(sx0, sy0, sz0) 
-monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,mx))
+monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
 monitor2D = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(0,mx,mx))
 
-
-runImages = True
-runData = False
 
 #Inside the geometry object, the device structure is specified together with its center and the type of the material used
 geometry = [shapes.sph]
 
 #Boundary conditions using Perfectly Maching Layers PML// ficticius absorbtion material to avoid reflection of the fields
 pml_layers = [mp.PML(dpml)]
-
-sym = [mp.Mirror(mp.X, phase=-1)] # symmetry condition to reduce simulation time
 
 '''
 2D view of the box
@@ -115,7 +109,7 @@ gaussian=mp.Source(mp.GaussianSource(wavelength=w,fwidth=df),
                      center=mp.Vector3(0,-sc,0),
                      size=mp.Vector3(sw,0,sw))
 
-pt=mp.Vector3(0,sc,0) # point used to measure decay of Field (in oposite side of the source)
+pt=mp.Vector3(1.1*rad,0,0) # point used to measure decay of Field (in oposite side of the source)
 
 sources = [gaussian]
 
@@ -155,217 +149,160 @@ refl_fr_r = mp.FluxRegion(center=mp.Vector3(fx/2,0,0), size=mp.Vector3(0,fx,fx))
 refl_fr_up = mp.FluxRegion(center=mp.Vector3(0,0,fx/2), size=mp.Vector3(fx,fx,0))
 refl_fr_dw = mp.FluxRegion(center=mp.Vector3(0,0,-fx/2), size=mp.Vector3(fx,fx,0))
 
-# transmitted flux, origin at source, but size as large as the flux side
-tran_fr = mp.FluxRegion(center=mp.Vector3(0,-sc,0), size=mp.Vector3(fx,0,fx))
 
-if runData:
-    print('something')
-    '''
-    ------------------------------
-    1st simulaton without particle and Get normal flux
-    ------------------------------
-    '''
 
-    sim = mp.Simulation(cell_size=cell,
-                        boundary_layers=pml_layers,
-                        geometry=[],
-                        sources=sources,
-                        symmetries=sym,
-                        resolution=resolution,
-                        Courant=courant)
-    
-    refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t)
-    refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
-    refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
-    refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
-    
-    refl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
-    refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
-    
-    
-    tran = sim.add_flux(fcen,df,nfreq,tran_fr)
-    
-    sim.use_output_directory('flux-sph_0')
-    sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
-            mp.in_volume(monitor, mp.to_appended("ez", mp.at_every(time_step, mp.output_efield_x))),
-            until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
-    
-    # for normalization run, save flux fields data for reflection plane
-    straight_refl_data_t = sim.get_flux_data(refl_t)
-    straight_refl_data_b = sim.get_flux_data(refl_b)
-    straight_refl_data_l = sim.get_flux_data(refl_l)
-    straight_refl_data_r = sim.get_flux_data(refl_r)
-    
-    straight_refl_data_up = sim.get_flux_data(refl_up)
-    straight_refl_data_dw = sim.get_flux_data(refl_dw)
-    
-    # save incident power for transmission plane
-    incident_tran_flux = mp.get_fluxes(tran)
-    flux_freqs = mp.get_flux_freqs(tran)
-    
-    '''
-    ------------------------------------------------
-    2nd Simulation with particle and get Scattered Flux
-    ------------------------------------------------
-    '''
-    sim.reset_meep()
-    
-    sim = mp.Simulation(cell_size=cell,
-                        boundary_layers=pml_layers,
-                        geometry=geometry,
-                        sources=sources,
-                        symmetries=sym,
-                        resolution=resolution,
-                        Courant=courant)
-    
-    # reflected flux
-    refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t)
-    refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
-    refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
-    refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
-    
-    refl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
-    refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
-    
-    # for normal run, load negated fields to subtract incident from refl. fields
-    sim.load_minus_flux_data(refl_t, straight_refl_data_t)
-    sim.load_minus_flux_data(refl_b, straight_refl_data_b)
-    sim.load_minus_flux_data(refl_l, straight_refl_data_l)
-    sim.load_minus_flux_data(refl_r, straight_refl_data_r)
-    
-    sim.load_minus_flux_data(refl_up, straight_refl_data_up)
-    sim.load_minus_flux_data(refl_dw, straight_refl_data_dw)
-    
-    
-    sim.use_output_directory('flux-sph_1')
-    sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
-            mp.in_volume(monitor, mp.to_appended("ez", mp.at_every(time_step, mp.output_efield_x))),
-            until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
-    
-    #scat_refl_flux = mp.get_fluxes(refl)                                            
-    #save scattered reflected flux from the surfaces
-    scat_refl_data_t = mp.get_fluxes(refl_t)
-    scat_refl_data_b = mp.get_fluxes(refl_b)
-    scat_refl_data_l = mp.get_fluxes(refl_l)
-    scat_refl_data_r = mp.get_fluxes(refl_r)
-    
-    scat_refl_data_up = mp.get_fluxes(refl_up)
-    scat_refl_data_dw = mp.get_fluxes(refl_dw)
-    
-    '''
-    --------------------------------
-    3rd Simulation with nanoparticle to get the absorbance
-    --------------------------------
-    '''
-    sim.reset_meep()
-    
-    #Defining the final simulation object
-    sim = mp.Simulation(cell_size=cell,
-                        boundary_layers=pml_layers,
-                        geometry=geometry,
-                        sources=sources,
-                        symmetries=sym,
-                        resolution=resolution,
-                        Courant=courant)
-    
-    # reflected flux
-    refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t)
-    refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
-    refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
-    refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
-    
-    refl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
-    refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
-    
-    sim.use_output_directory('flux-sph_2')
-    sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
-            mp.in_volume(monitor, mp.to_appended("ez", mp.at_every(time_step, mp.output_efield_x))),
-            until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
-    
-    #abs_refl_flux = mp.get_fluxes(refl)                                            
-    #trans_flux_structure_abs.dat
-    abs_refl_data_t = mp.get_fluxes(refl_t)
-    abs_refl_data_b = mp.get_fluxes(refl_b)
-    abs_refl_data_l = mp.get_fluxes(refl_l)
-    abs_refl_data_r = mp.get_fluxes(refl_r)
-    
-    abs_refl_data_up = mp.get_fluxes(refl_up)
-    abs_refl_data_dw = mp.get_fluxes(refl_dw)
+'''
+------------------------------
+1st simulaton without particle and Get normal flux
+------------------------------
+'''
 
-    '''
-    ------------------------------------------------
-    Plotting the extintion, scattering and absorbtion
-    ------------------------------------------------
-    '''
-    wl = []
-    scat = []
-    absoH = []
-    absoV = []
-    
-    
-    orig_flux=incident_tran_flux #make a copy of the data to avoid simulate again
-    
-    for k in range(len(orig_flux)):
-        orig_flux[k] = abs(orig_flux[k])/ (4*rad) # 4*rad is the side of the flux monitor
-    
-    for i in range(0, nfreq):
-        wl = np.append(wl, 1/flux_freqs[i]) # constructs the x axis wavelength
-    
-        scat_refl_flux = abs(scat_refl_data_t[i] - scat_refl_data_b[i] - scat_refl_data_l[i] + scat_refl_data_r[i] - scat_refl_data_up[i] +scat_refl_data_dw[i])
-        scat = np.append(scat, scat_refl_flux/orig_flux[i])
-        
-        abs_refl_flux = abs(abs_refl_data_t[i] - abs_refl_data_b[i]) 
-        absoV = np.append(absoV, abs_refl_flux/orig_flux[i])
-        
-        abs_refl_flux2 = abs(abs_refl_data_l[i] - abs_refl_data_r[i])
-        absoH = np.append(absoH, abs_refl_flux2/orig_flux[i])
-    
-        abs_refl_flux3 = abs(abs_refl_data_up[i] - abs_refl_data_dw[i])
-        absoZ = np.append(absoZ, abs_refl_flux3/orig_flux[i])
-    
-    plt.figure
-    ext=scat + absoH + absoV + absoZ
-    peaks, _ = find_peaks(ext, height=0.05)
-    
-    plt.plot(wl[peaks], ext[peaks], "x")
-    plt.plot(wl,scat,'-',label='scatering')
-    plt.plot(wl,absoH,'-',label='absorptionH')
-    plt.plot(wl,absoV,'-',label='absorptionV')
-    plt.plot(wl,absoZ,'-',label='absorptionZ')
+sim = mp.Simulation(cell_size=cell,
+                    boundary_layers=pml_layers,
+                    geometry=[],
+                    sources=sources,
+                    resolution=resolution,
+                    Courant=courant)
 
-    plt.plot(wl,ext, '-', label='extinction')
-    
-    #plt.plot(wl[peaksW], ext[peaks], "x")
-    #plt.plot(wl,extW, '-', label='extinction with Water')
-    
-    
-    plt.xlabel("wavelength (um)")
-    plt.legend(loc="upper right")
-    plt.show()
+refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t)
+refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
+refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
+refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
+
+refl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
+refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
     
 
-if runImages:
+sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+
+
+# for normalization run, save flux fields data for reflection plane
+straight_refl_data_t = sim.get_flux_data(refl_t)
+straight_refl_data_b = sim.get_flux_data(refl_b)
+straight_refl_data_l = sim.get_flux_data(refl_l)
+straight_refl_data_r = sim.get_flux_data(refl_r)
+
+straight_refl_data_up = sim.get_flux_data(refl_up)
+straight_refl_data_dw = sim.get_flux_data(refl_dw)
+
+# save incident flux for transmission plane
+incident_tran_flux = mp.get_fluxes(refl_b)
+
+'''
+------------------------------------------------
+2nd Simulation with particle and get Scattered Flux
+------------------------------------------------
+'''
+sim.reset_meep()
+
+sim = mp.Simulation(cell_size=cell,
+                    boundary_layers=pml_layers,
+                    geometry=geometry,
+                    sources=sources,
+                    resolution=resolution,
+                    Courant=courant)
+
+# reflected flux
+refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t)
+refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
+refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
+refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
+
+refl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
+refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
+
+# absorbed flux
+arefl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t)
+arefl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
+arefl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
+arefl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
+
+arefl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
+arefl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
+
+# for normal run, load negated fields to subtract incident from refl. fields
+sim.load_minus_flux_data(refl_t, straight_refl_data_t)
+sim.load_minus_flux_data(refl_b, straight_refl_data_b)
+sim.load_minus_flux_data(refl_l, straight_refl_data_l)
+sim.load_minus_flux_data(refl_r, straight_refl_data_r)
+
+sim.load_minus_flux_data(refl_up, straight_refl_data_up)
+sim.load_minus_flux_data(refl_dw, straight_refl_data_dw)
+
+
+sim.use_output_directory('flux-sph_1')
+sim.run(mp.in_volume(monitor2D, mp.at_beginning(mp.output_epsilon)),
+        mp.in_volume(monitor2D, mp.to_appended("ez", mp.at_every(time_step, mp.output_efield_x))),
+        until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+
+#get reflected flux from the surfaces
+scat_refl_data_t = mp.get_fluxes(refl_t)
+scat_refl_data_b = mp.get_fluxes(refl_b)
+scat_refl_data_l = mp.get_fluxes(refl_l)
+scat_refl_data_r = mp.get_fluxes(refl_r)
+
+scat_refl_data_up = mp.get_fluxes(refl_up)
+scat_refl_data_dw = mp.get_fluxes(refl_dw)
+
+#get absorbed fluxes from the surfaces
+abs_refl_data_t = mp.get_fluxes(arefl_t)
+abs_refl_data_b = mp.get_fluxes(arefl_b)
+abs_refl_data_l = mp.get_fluxes(arefl_l)
+abs_refl_data_r = mp.get_fluxes(arefl_r)
+
+abs_refl_data_up = mp.get_fluxes(arefl_up)
+abs_refl_data_dw = mp.get_fluxes(arefl_dw)
+
+flux_freqs = mp.get_flux_freqs(arefl_b)
+
+
+'''
+------------------------------------------------
+Plotting the extintion, scattering and absorbtion
+------------------------------------------------
+'''
+wl = []
+scat = []
+abso = []
+ext=[]
+
+for i in range(0, nfreq):
+    wl = np.append(wl, 1/flux_freqs[i]) # constructs the x axis wavelength
+
+    scat_refl_flux = abs(scat_refl_data_t[i] - scat_refl_data_b[i]) + abs(scat_refl_data_l[i] - scat_refl_data_r[i]) + abs(scat_refl_data_up[i] - scat_refl_data_dw[i])
+    scat = np.append(scat, scat_refl_flux/incident_tran_flux[i])
     
-    '''
-    --------------------------------
-    Simulation with nanoparticle to get the images
-    --------------------------------
-    '''
-    if runData:    
-        sim.reset_meep()
+    abs_refl_flux = abs(abs_refl_data_t[i] - abs_refl_data_b[i]) + abs(abs_refl_data_l[i] - abs_refl_data_r[i]) + abs(abs_refl_data_up[i] - abs_refl_data_dw[i])
+    abso = np.append(abso, abs_refl_flux/incident_tran_flux[i])
     
-    #Defining the final simulation object
-    sim = mp.Simulation(cell_size=cell,
-                        boundary_layers=pml_layers,
-                        geometry=geometry,
-                        sources=sources,
-                        symmetries=sym,
-                        resolution=resolutionImages,
-                        Courant=courant)
-    #meep.Volume(center=meep.Vector3(0,0,0), size=meep.Vector3(10,0,0)), meep.output_dpwr
-    sim.use_output_directory('nanosphere-imgs')
-    sim.run(mp.in_volume(monitor2D, mp.at_beginning(mp.output_epsilon)),
-            mp.in_volume(monitor2D, mp.at_every(time_step, mp.output_png(mp.Hz, "-Zc dkbluered"))),
-            until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+
+#multily for area of the sides to get the crossection in nm,
+# area=4*rad=100 nm
+scat=scat*rad*rad*10000
+abso=abso*rad*rad*10000
+ext=scat + abso
+
+plt.figure()
+plt.plot(wl,scat,'ob',label='scatering')
+plt.plot(wl,abso,'sr',label='absorption')
+plt.plot(wl,ext,'^g', label='extinction')
+
+#Analytical model
+x=c_coreshell(wl*1000,'Ag','Ag',1,15,10,5)
+
+plt.plot(x[0:,0],x[0:,1], '-k',label='Analytical model')
+plt.plot(x[0:,0],x[0:,2], '-k')
+plt.plot(x[0:,0],x[0:,3], '-k')
+
+radx=rad*1000
+plt.title('Efficiencies of Silver sphere of radius %inm' %radx)
+plt.xlabel("wavelength (um)")
+plt.ylabel("Efficiencies")
+plt.legend(loc="upper right")  
+plt.axis([0.24, 0.7, 0, max(ext)*1.2])
+plt.grid(True)
+plt.minorticks_on()
+plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+
     
-    print("Completed")
+

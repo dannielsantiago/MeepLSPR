@@ -31,11 +31,11 @@ def C_wire90(wl,material,nout,rad,v,pol):
     pol     'TM' or 'TE' - polarisation of the EM wave
             'TE' E-field perpendicular to the wire axes    
     '''
-    print "wavelenght: " + str(type(wl))
-    print "refractive index medium: "+ str(nout)
-    print "radius of wire in nm: "+ str(rad)
-    print "order of the expansion: "+ str(v)
-    print "Polarisation: "+ str(pol)
+    print ("wavelenght: " + str(type(wl)))
+    print ("refractive index medium: "+ str(nout))
+    print ("radius of wire in nm: "+ str(rad))
+    print ("order of the expansion: "+ str(v))
+    print ("Polarisation: "+ str(pol))
     
     wl=list(wl)
     
@@ -60,12 +60,12 @@ def C_wire90(wl,material,nout,rad,v,pol):
         if pol == 'TM': #cn = an coefficients
             for k in range(v):
                 cn[0:,k]=(m*jvp(k,x)*jv(k,mx)-jvp(k,mx)*jv(k,x))/(m*jv(k,mx)*h1vp(k,x)-jvp(k,mx)*hankel1(k,x))
-            print 'TM polarisation'
+            print ('TM polarisation')
             
         elif pol == 'TE':#cn = bn coefficients
             for k in range(v):
                 cn[0:,k]=(jvp(k,x)*jv(k,mx)-m*jvp(k,mx)*jv(k,x))/(jv(k,mx)*h1vp(k,x)-m*jvp(k,mx)*hankel1(k,x))
-            print 'TE polarisation'
+            print ('TE polarisation')
         else:
             warnings.warn("Warning, udefinied polarisation",Warning)
         

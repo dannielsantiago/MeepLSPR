@@ -11,11 +11,11 @@ import c_wire90 as theoretical
 ------------------------Parameters of the simulation
 '''
 rad=shapes.rad
-w=0.4                  # wavelength
+w=0.357                  # wavelength
 fcen=1/w                # Pulse center frequency
-df = 3.5                 # pulse frequency width 
-cutoff=5
-axis=mp.Ex              # Axis of direction of the pulse Ex=TM, Hx=TE
+df = 3.5                # 3,5pulse frequency width 
+cutoff=10
+polarisation=mp.Ex      # Axis of direction of the pulse Ex=TM, Hx=TE
 dpml = w                # Width of th pml layers = wavelength
 sx = 14*rad             # Size of inner shell
 sy = 14*rad             # Size of inner shell
@@ -29,8 +29,8 @@ nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 time_step=0.05           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution =600         # resolution pixels/um (pixels/micrometers)
-decay = 1e-9           # decay limit condition for the field measurement
+resolution =2500        # resolution pixels/um (pixels/micrometers)
+decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
 
@@ -84,11 +84,12 @@ Gaussian
 
 # Defining the sources, the y-axis is inverted so propagation direction is down
 gaussian=mp.Source(mp.GaussianSource(wavelength=w, fwidth=df, cutoff=cutoff),
-                     component=axis,
+                     component=polarisation,
                      center=mp.Vector3(0,-sx,0),
+                     amplitude=-1,
                      size=mp.Vector3(sw,0,0))
 
-pt=mp.Vector3(1.1*rad,0,0) # point used to measure decay of Field (in oposite side of the source)
+pt=mp.Vector3(1.1*rad,0,0) # 1.1*radpoint used to measure decay of Field (in oposite side of the source)
 
 
 
@@ -135,15 +136,18 @@ sim = mp.Simulation(cell_size=cell,
                     resolution=resolution,
                     Courant=courant)
 
+#1.05112
+#4.55112
+
+    
+dft_obj = sim.add_dft_fields([mp.Ex], 1.05112, 4.55112, 100, where=monitor)
+
 refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t) 
 refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
 refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
 refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
 
-sim.use_output_directory('flux-out_0')
-sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
-        mp.in_volume(monitor, mp.to_appended("ex", mp.at_every(time_step, mp.output_efield_x))),
-        until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 
 # for normalization run, save flux fields data for reflection plane
 straight_refl_data_t = sim.get_flux_data(refl_t)
@@ -154,7 +158,8 @@ straight_refl_data_r = sim.get_flux_data(refl_r)
 incident_flux = mp.get_fluxes(refl_b) 
 incident_flux2 = mp.get_fluxes(refl_t) 
 
-
+ex0_data = np.real(sim.get_dft_array(dft_obj, polarisation, 0))
+flux_freqsX = np.array(mp.get_flux_freqs(refl_b))
 
 
 '''
@@ -189,10 +194,21 @@ sim.load_minus_flux_data(refl_b, straight_refl_data_b)
 sim.load_minus_flux_data(refl_l, straight_refl_data_l)
 sim.load_minus_flux_data(refl_r, straight_refl_data_r)
 
+#
+dft_objx=[]
+for i in range(len(flux_freqsX)):
+    dft_objx=np.append(dft_objx,sim.add_dft_fields([polarisation], flux_freqsX[i], flux_freqsX[i], 1, where=monitor))
+    
+dft_obj = sim.add_dft_fields([polarisation], fcen, fcen, 1, where=monitor)
+
+
 sim.use_output_directory('flux-out_1')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         mp.in_volume(monitor, mp.to_appended("ez", mp.at_every(time_step, mp.output_efield_x))),
-        until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+        until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
+'''
+sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
+'''
 
 #save scattered reflected flux from the surfaces
 scat_refl_data_t = mp.get_fluxes(refl_t)
@@ -209,13 +225,17 @@ abs_refl_data_r = mp.get_fluxes(arefl_r)
 # save incident power for transmission plane
 
 transmitted_flux = abs_refl_data_b
-transmitted_flux2 = abs_refl_data_t
+flux_freqs = mp.get_flux_freqs(arefl_b)
 
 
-flux_freqsb = mp.get_flux_freqs(arefl_b)
-flux_freqst = mp.get_flux_freqs(arefl_t)
+eps_data = sim.get_array(vol=monitor, component=mp.Dielectric)
+ex_data = np.real(sim.get_dft_array(dft_obj, polarisation, 0))
 
-
+ex_data_array = []
+for i in range(len(flux_freqsX)):
+    ex_data_array=np.append(ex_data_array,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))
+print(type(ex_data_array))
+ex_data_array=ex_data_array.reshape((nfreq,len(eps_data),len(eps_data)))
 
 
 '''
@@ -234,7 +254,7 @@ mat=[]
 
 
 for i in range(0, nfreq):
-    wl = np.append(wl, 1/flux_freqsb[i]) # constructs the x axis wavelength
+    wl = np.append(wl, 1/flux_freqs[i]) # constructs the x axis wavelength
 
     scat_refl_flux = abs(scat_refl_data_t[i] - scat_refl_data_b[i] + scat_refl_data_l[i]- scat_refl_data_r[i])
     scat = np.append(scat, scat_refl_flux/incident_flux[i])
@@ -260,7 +280,7 @@ ext=scat + abso
 check c_wire90.py for instructions
 ---------------------------------
 '''
-mat=theoretical.C_wire90(wl*1000,'Au',1,shapes.rad*1000,16,'TM')
+mat=theoretical.C_wire90(wl*1000,'Ag',1,shapes.rad*1000,16,'TM')
 
 plt.figure()
 #plt.plot(wl[peaks], ext[peaks], "x")
@@ -271,22 +291,70 @@ plt.plot(wl,ext,'^g', label='extinction')
 plt.plot(mat[0:,0],mat[0:,1], '-k', label='Analytical model')
 plt.plot(mat[0:,0],mat[0:,2], '-k')
 plt.plot(mat[0:,0],mat[0:,3], '-k')
-
+'''
 plt.plot(wl,norm, '-', label='incident pulse', linestyle='--')
 plt.plot(wl,tran, '-', label='transmitted pulse', linestyle='--')
 plt.plot(wl,scatt, '-', label='scatt pulse', linestyle='--')
-
+'''
 radx=rad*1000
 plt.title('Cross-sections of Silver Nanowire of radius %inm and TM polarisation' %radx)
 plt.xlabel("wavelength (um)")
 plt.ylabel("cross-section (nm)")
 plt.legend(loc="upper right")  
-plt.axis([0.24, 0.7, 0, mat[0:,1]*1.2])
+plt.axis([0.24, 0.7, 0, max(mat[0:,1])*1.2])
 plt.grid(True)
 plt.minorticks_on()
 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
    
          
+y=np.array(ext)[np.newaxis].T
+yref=mat[0:,1]
+
+deltaSignal = abs(y - yref)
+percentageDifference = (deltaSignal/yref)*100 # Percent by element. *100
+plt.figure()  
+plt.plot(wl,percentageDifference, '--r', label='% error')
+#plt.plot(wl,np.ones(len(wl))*meanPctDiff,'r', label='%.2f%% avg error' %meanPctDiff)
+plt.axis([0.24, 0.7, 0, max(percentageDifference)*1.2])  
+plt.grid(True)
+plt.minorticks_on()
+plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+plt.xlabel("wavelength (um)")
+plt.ylabel('% error', color='r')  
+plt.tick_params('y', colors='r')
+#plt.legend(loc="center right")  
+plt.show()
+
+
+plt.figure()
+plt.subplot(3,2,1)
+plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+plt.imshow(ex0_data.transpose(), interpolation='spline36', cmap='jet', alpha=0.9)
+
+plt.subplot(3,2,2)
+plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+plt.imshow(ex_data.transpose(), interpolation='spline36', cmap='jet', alpha=0.9)
+
+plt.subplot(3,2,3)
+plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+plt.imshow(np.square(ex_data.transpose()), interpolation='spline36', cmap='jet', alpha=0.9)
+
+plt.subplot(3,2,4)
+plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+plt.imshow(np.square(ex_data.transpose()/ex_data.max()), interpolation='spline36', cmap='jet', alpha=0.9)
+
+plt.axis('off')
+plt.show()
+print(ex0_data.min())
+plt.figure()
+
+for i in range(25):
+    plt.subplot(5,5,i+1)
+    plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+    plt.imshow(np.square(ex_data_array[int(99-(i*99/24))].transpose()), interpolation='spline36', cmap='jet', alpha=0.9)
+    plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
+plt.show()
+
 
 '''
 
@@ -305,33 +373,15 @@ hf.close()
 
 
 plot error
-     
-y=np.array(ext)[np.newaxis].T
-yref=mat[0:,1]
-
-deltaSignal = abs(y - yref)
-percentageDifference = (deltaSignal/yref)*100 # Percent by element. *100
-plt.figure()  
-#plt.title('% Error between Meep simulation and analythical model')
-plt.axis([0.24, 0.7, 0, max(percentageDifference)*1.2])  
-plt.grid(True)
-plt.minorticks_on()
-plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-plt.xlabel("wavelength (um)")
-#plt.twinx()
-plt.plot(wl,percentageDifference, '--r', label='% error')
-#plt.plot(wl,np.ones(len(wl))*meanPctDiff,'r', label='%.2f%% avg error' %meanPctDiff)
-plt.ylabel('% error', color='r')  
-plt.tick_params('y', colors='r')
-#plt.legend(loc="center right")  
-plt.show()
+  
 eps_data = sim.get_array(center=mp.Vector3(), size=mp.Vector3(mx,mx,0), component=mp.Dielectric)
 ez_data = sim.get_array(center=mp.Vector3(), size=mp.Vector3(mx,mx,0), component=mp.Ez)
 plt.figure()
 plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
 plt.imshow(ez_data.transpose(), interpolation='spline36', cmap='RdBu', alpha=0.9)
 plt.axis('off')
-plt.show()
+plt.show()   
+
 '''
 
 '''

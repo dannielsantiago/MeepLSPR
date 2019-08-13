@@ -15,8 +15,8 @@ import math
 
 # A cylinder of infinite radius and height 0.25 pointing along the x axis,
 # centered at the origin:
-rad=0.035 #micrometers units
-material=Au
+rad=0.025 #micrometers units
+material=Ag
 
 cyl = mp.Cylinder(center=mp.Vector3(0,0,0), height=mp.inf, radius=rad,
                   axis=mp.Vector3(0,0,1), material=material)
