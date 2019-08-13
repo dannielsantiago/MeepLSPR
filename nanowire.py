@@ -29,7 +29,7 @@ nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 time_step=0.05           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution =2500        # resolution pixels/um (pixels/micrometers)
+resolution =250        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
@@ -138,9 +138,12 @@ sim = mp.Simulation(cell_size=cell,
 
 #1.05112
 #4.55112
-
+flux_freqsXX=np.linspace(1.051120448179272,4.551120448179272,100)
+dft_objx=[]
+for i in range(nfreq):
+    dft_objx=np.append(dft_objx,sim.add_dft_fields([polarisation], flux_freqsXX[i], flux_freqsXX[i], 1, where=monitor))
     
-dft_obj = sim.add_dft_fields([mp.Ex], 1.05112, 4.55112, 100, where=monitor)
+dft_obj = sim.add_dft_fields([mp.Ex], fcen, fcen, 1, where=monitor)
 
 refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t) 
 refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
@@ -160,6 +163,10 @@ incident_flux2 = mp.get_fluxes(refl_t)
 
 ex0_data = np.real(sim.get_dft_array(dft_obj, polarisation, 0))
 flux_freqsX = np.array(mp.get_flux_freqs(refl_b))
+ex0_data_array = []
+for i in range(nfreq):
+    ex0_data_array=np.append(ex0_data_array,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))
+ex0_data_array=ex0_data_array.reshape((nfreq,len(ex0_data),len(ex0_data)))
 
 
 '''
@@ -234,7 +241,6 @@ ex_data = np.real(sim.get_dft_array(dft_obj, polarisation, 0))
 ex_data_array = []
 for i in range(len(flux_freqsX)):
     ex_data_array=np.append(ex_data_array,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))
-print(type(ex_data_array))
 ex_data_array=ex_data_array.reshape((nfreq,len(eps_data),len(eps_data)))
 
 
@@ -337,24 +343,66 @@ plt.imshow(ex_data.transpose(), interpolation='spline36', cmap='jet', alpha=0.9)
 
 plt.subplot(3,2,3)
 plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-plt.imshow(np.square(ex_data.transpose()), interpolation='spline36', cmap='jet', alpha=0.9)
+plt.imshow(ex_data.transpose()-ex0_data.transpose(), interpolation='spline36', cmap='jet', alpha=0.9)
 
 plt.subplot(3,2,4)
 plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-plt.imshow(np.square(ex_data.transpose()/ex_data.max()), interpolation='spline36', cmap='jet', alpha=0.9)
+plt.imshow(np.square(ex_data.transpose()-ex0_data.transpose()), interpolation='spline36', cmap='jet', alpha=0.9)
+
+plt.subplot(3,2,5)
+plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+plt.imshow(np.log10(1/abs(ex_data.transpose()-ex0_data.transpose())), interpolation='spline36', cmap='jet', alpha=0.9)
+
+plt.subplot(3,2,6)
+plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+plt.imshow(np.log(np.square(ex_data.transpose()-ex0_data.transpose())), interpolation='spline36', cmap='jet', alpha=0.9)
 
 plt.axis('off')
 plt.show()
-print(ex0_data.min())
+#FT with particle
 plt.figure()
-
 for i in range(25):
     plt.subplot(5,5,i+1)
     plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
     plt.imshow(np.square(ex_data_array[int(99-(i*99/24))].transpose()), interpolation='spline36', cmap='jet', alpha=0.9)
     plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
 plt.show()
+#ft without particle
+plt.figure()
+for i in range(25):
+    plt.subplot(5,5,i+1)
+    plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+    plt.imshow(np.square(ex0_data_array[int(99-(i*99/24))].transpose()), interpolation='spline36', cmap='jet', alpha=0.9)
+    plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
+plt.show()
 
+data2=[]
+datalog=[]
+for i in range(25):
+    data2=np.append(data2,np.square(ex_data_array[int(99-(i*99/24))].transpose()-ex0_data_array[int(99-(i*99/24))].transpose()))
+    datalog=np.append(datalog,np.log10(np.square(ex_data_array[int(99-(i*99/24))].transpose()-ex0_data_array[int(99-(i*99/24))].transpose())))
+data2=data2.reshape((25,len(eps_data),len(eps_data)))
+datalog=datalog.reshape((25,len(eps_data),len(eps_data)))
+
+
+plt.figure()
+for i in range(25):
+    plt.subplot(5,5,i+1)
+    plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+    plt.imshow(data2[i], interpolation='spline36', cmap='jet', alpha=0.9, vmin=data2.min(), vmax=data2.max())
+    plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
+    plt.colorbar()
+plt.show()
+
+
+plt.figure()
+for i in range(25):
+    plt.subplot(5,5,i+1)
+    plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+    plt.imshow(datalog[i], interpolation='spline36', cmap='jet', alpha=0.9, vmin=datalog.min(), vmax=datalog.max())
+    plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
+    plt.colorbar()
+plt.show()
 
 '''
 
