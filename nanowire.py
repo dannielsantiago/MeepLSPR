@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import _shapes as shapes
 from scipy.signal import find_peaks
+import h5py
 
 import c_wire90 as theoretical
 
@@ -89,7 +90,7 @@ gaussian=mp.Source(mp.GaussianSource(wavelength=w, fwidth=df, cutoff=cutoff),
                      amplitude=-1,
                      size=mp.Vector3(sw,0,0))
 
-pt=mp.Vector3(1.1*rad,0,0) # 1.1*radpoint used to measure decay of Field (in oposite side of the source)
+pt=mp.Vector3(-sw,0,0) # 1.1*radpoint used to measure decay of Field (in oposite side of the source)
 
 
 
@@ -150,8 +151,11 @@ refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
 refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
 refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
 
-sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
-
+#sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
+sim.use_output_directory('flux-out')
+sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
+        mp.in_volume(monitor, mp.to_appended("ex0", mp.at_every(time_step, mp.output_efield_x))),
+        until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 # for normalization run, save flux fields data for reflection plane
 straight_refl_data_t = sim.get_flux_data(refl_t)
 straight_refl_data_b = sim.get_flux_data(refl_b)
@@ -209,9 +213,9 @@ for i in range(len(flux_freqsX)):
 dft_obj = sim.add_dft_fields([polarisation], fcen, fcen, 1, where=monitor)
 
 
-sim.use_output_directory('flux-out_1')
+sim.use_output_directory('flux-out')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
-        mp.in_volume(monitor, mp.to_appended("ez", mp.at_every(time_step, mp.output_efield_x))),
+        mp.in_volume(monitor, mp.to_appended("ex", mp.at_every(time_step, mp.output_efield_x))),
         until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 '''
 sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
@@ -287,7 +291,11 @@ check c_wire90.py for instructions
 ---------------------------------
 '''
 mat=theoretical.C_wire90(wl*1000,'Ag',1,shapes.rad*1000,16,'TM')
-
+'''
+------------------------------------------------------
+Section to plot Meep simulation and Analytical response 
+------------------------------------------------------ 
+''' 
 plt.figure()
 #plt.plot(wl[peaks], ext[peaks], "x")
 plt.plot(wl,scat,'ob',label='scatering')
@@ -312,7 +320,11 @@ plt.grid(True)
 plt.minorticks_on()
 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
    
-         
+'''
+------------------------------
+Section to plot fiting error 
+------------------------------
+'''        
 y=np.array(ext)[np.newaxis].T
 yref=mat[0:,1]
 
@@ -332,33 +344,12 @@ plt.tick_params('y', colors='r')
 plt.show()
 
 
-plt.figure()
-plt.subplot(3,2,1)
-plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-plt.imshow(ex0_data.transpose(), interpolation='spline36', cmap='jet', alpha=0.9)
 
-plt.subplot(3,2,2)
-plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-plt.imshow(ex_data.transpose(), interpolation='spline36', cmap='jet', alpha=0.9)
-
-plt.subplot(3,2,3)
-plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-plt.imshow(ex_data.transpose()-ex0_data.transpose(), interpolation='spline36', cmap='jet', alpha=0.9)
-
-plt.subplot(3,2,4)
-plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-plt.imshow(np.square(ex_data.transpose()-ex0_data.transpose()), interpolation='spline36', cmap='jet', alpha=0.9)
-
-plt.subplot(3,2,5)
-plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-plt.imshow(np.log10(1/abs(ex_data.transpose()-ex0_data.transpose())), interpolation='spline36', cmap='jet', alpha=0.9)
-
-plt.subplot(3,2,6)
-plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-plt.imshow(np.log(np.square(ex_data.transpose()-ex0_data.transpose())), interpolation='spline36', cmap='jet', alpha=0.9)
-
-plt.axis('off')
-plt.show()
+'''
+-----------------------------------
+Section to plot frequency response
+---------------------------------- 
+'''
 #FT with particle
 plt.figure()
 for i in range(25):
@@ -376,32 +367,72 @@ for i in range(25):
     plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
 plt.show()
 
+
+def showMultiple(row,col,esp_data,array):
+    plt.figure()
+    for i in range(N):
+        plt.subplot(row,col,i+1)
+        plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+        plt.imshow(array[i], interpolation='spline36', cmap='jet', alpha=0.9, vmin=array.min(), vmax=array.max())
+        plt.ylabel(str(int(1000/flux_freqs[int(x[i])]))+' nm')
+        plt.colorbar()
+    plt.show()
+    
+   
 data2=[]
+data3=[]
 datalog=[]
-for i in range(25):
-    data2=np.append(data2,np.square(ex_data_array[int(99-(i*99/24))].transpose()-ex0_data_array[int(99-(i*99/24))].transpose()))
-    datalog=np.append(datalog,np.log10(np.square(ex_data_array[int(99-(i*99/24))].transpose()-ex0_data_array[int(99-(i*99/24))].transpose())))
-data2=data2.reshape((25,len(eps_data),len(eps_data)))
-datalog=datalog.reshape((25,len(eps_data),len(eps_data)))
+row=5
+col=5
+N=row*col
+
+x=np.linspace(99,0,N)
+
+for i in range(N):
+    data2=np.append(data2,np.square(ex_data_array[int(x[i])].transpose()-ex0_data_array[int(x[i])].transpose()))
+    data3=np.append(data3,np.square(ex_data_array[int(x[i])].transpose())-np.square(ex0_data_array[int(x[i])].T))
+    datalog=np.append(datalog,np.log10(np.square(ex_data_array[int(x[i])].transpose()-ex0_data_array[int(x[i])].transpose())))
+    
+data2=data2.reshape((N,len(eps_data),len(eps_data)))
+datalog=datalog.reshape((N,len(eps_data),len(eps_data)))
+data3=data3.reshape((N,len(eps_data),len(eps_data)))
+
+showMultiple(row,col,eps_data,data2)
+showMultiple(row,col,eps_data,data3)
+showMultiple(row,col,eps_data,datalog)
+
+'''
+-------------------------------------
+Section to plot time-stepped response 
+--------------------------------------
+'''
+
+#load Electric fields generated by the simulation and compute the difference
+E0_file = h5py.File("flux-out/nanowire-ex0.h5")
+E_file = h5py.File("flux-out/nanowire-ex.h5")
 
 
+E0=np.array(E0_file.get('ex')).T
+E=np.array(E_file.get('ex')).T
+#They must be the same size
+print(len(E0[1]))
+print(np.shape(E))
+E0_file.close()
+E_file.close()
+#write in .h5 file the difference of electrics fields than later can be converted to images using terminal commands
+Ed=E-E0
+Ed_file = h5py.File('flux-out/E_diff.h5','w')
+Ed_file.create_dataset('ex',data=Ed.T)
+Ed_file.close()
+#plot subset of time-snapshots of the difference of electric fields
 plt.figure()
-for i in range(25):
-    plt.subplot(5,5,i+1)
+for i in range(30):    
+    plt.subplot(6,5,i+1)
     plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-    plt.imshow(data2[i], interpolation='spline36', cmap='jet', alpha=0.9, vmin=data2.min(), vmax=data2.max())
-    plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
-    plt.colorbar()
-plt.show()
-
-
-plt.figure()
-for i in range(25):
-    plt.subplot(5,5,i+1)
-    plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-    plt.imshow(datalog[i], interpolation='spline36', cmap='jet', alpha=0.9, vmin=datalog.min(), vmax=datalog.max())
-    plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
-    plt.colorbar()
+    plt.imshow(Ed[60+i], interpolation='spline36', cmap='RdBu', alpha=0.9, vmin=Ed.min(), vmax=Ed.max())
+    #plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
+    #plt.colorbar()
+    plt.axis('off')
 plt.show()
 
 '''

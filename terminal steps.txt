@@ -1,4 +1,4 @@
-h5ls nanowire-ez.h5
-h5topng -t 43:44 -R -Zc dkbluered -a yarg -A nanowire-eps-000000000.h5 nanowire-ez.h5
-convert nanowire-ez.t*.png ez.gif
+h5ls E_diff.h5
+h5topng -t 0:119 -R -Zc dkbluered -a yarg -A nanowire-eps-000000000.h5 E_diff.h5
+convert E_diff.t*.png ez.gif
 rm *.png
