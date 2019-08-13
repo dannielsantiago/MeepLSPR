@@ -11,10 +11,10 @@ import c_wire90 as theoretical
 ------------------------Parameters of the simulation
 '''
 rad=shapes.rad
-w=0.4                  # wavelength
+w=0.357                  # wavelength
 fcen=1/w                # Pulse center frequency
-df = 3.5                 # pulse frequency width 
-cutoff=5
+df = 3.5                # 3,5pulse frequency width 
+cutoff=10
 polarisation=mp.Ex      # Axis of direction of the pulse Ex=TM, Hx=TE
 dpml = w                # Width of th pml layers = wavelength
 sx = 14*rad             # Size of inner shell
@@ -29,8 +29,8 @@ nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 time_step=0.05           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution =250         # resolution pixels/um (pixels/micrometers)
-decay = 1e-9           # decay limit condition for the field measurement
+resolution =2500        # resolution pixels/um (pixels/micrometers)
+decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
 
@@ -86,9 +86,10 @@ Gaussian
 gaussian=mp.Source(mp.GaussianSource(wavelength=w, fwidth=df, cutoff=cutoff),
                      component=polarisation,
                      center=mp.Vector3(0,-sx,0),
+                     amplitude=-1,
                      size=mp.Vector3(sw,0,0))
 
-pt=mp.Vector3(1.1*rad,0,0) # point used to measure decay of Field (in oposite side of the source)
+pt=mp.Vector3(1.1*rad,0,0) # 1.1*radpoint used to measure decay of Field (in oposite side of the source)
 
 
 
@@ -135,7 +136,11 @@ sim = mp.Simulation(cell_size=cell,
                     resolution=resolution,
                     Courant=courant)
 
-dft_obj = sim.add_dft_fields([mp.Ex], fcen, fcen, 1, where=monitor)
+#1.05112
+#4.55112
+
+    
+dft_obj = sim.add_dft_fields([mp.Ex], 1.05112, 4.55112, 100, where=monitor)
 
 refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t) 
 refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
@@ -154,6 +159,7 @@ incident_flux = mp.get_fluxes(refl_b)
 incident_flux2 = mp.get_fluxes(refl_t) 
 
 ex0_data = np.real(sim.get_dft_array(dft_obj, polarisation, 0))
+flux_freqsX = np.array(mp.get_flux_freqs(refl_b))
 
 
 '''
@@ -188,8 +194,13 @@ sim.load_minus_flux_data(refl_b, straight_refl_data_b)
 sim.load_minus_flux_data(refl_l, straight_refl_data_l)
 sim.load_minus_flux_data(refl_r, straight_refl_data_r)
 
-# 
+#
+dft_objx=[]
+for i in range(len(flux_freqsX)):
+    dft_objx=np.append(dft_objx,sim.add_dft_fields([polarisation], flux_freqsX[i], flux_freqsX[i], 1, where=monitor))
+    
 dft_obj = sim.add_dft_fields([polarisation], fcen, fcen, 1, where=monitor)
+
 
 sim.use_output_directory('flux-out_1')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
@@ -219,6 +230,13 @@ flux_freqs = mp.get_flux_freqs(arefl_b)
 
 eps_data = sim.get_array(vol=monitor, component=mp.Dielectric)
 ex_data = np.real(sim.get_dft_array(dft_obj, polarisation, 0))
+
+ex_data_array = []
+for i in range(len(flux_freqsX)):
+    ex_data_array=np.append(ex_data_array,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))
+print(type(ex_data_array))
+ex_data_array=ex_data_array.reshape((nfreq,len(eps_data),len(eps_data)))
+
 
 '''
 ------------------------------------------------
@@ -309,15 +327,32 @@ plt.show()
 
 
 plt.figure()
+plt.subplot(3,2,1)
 plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
 plt.imshow(ex0_data.transpose(), interpolation='spline36', cmap='jet', alpha=0.9)
-plt.axis('off')
-plt.show()
 
-plt.figure()
+plt.subplot(3,2,2)
 plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
 plt.imshow(ex_data.transpose(), interpolation='spline36', cmap='jet', alpha=0.9)
+
+plt.subplot(3,2,3)
+plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+plt.imshow(np.square(ex_data.transpose()), interpolation='spline36', cmap='jet', alpha=0.9)
+
+plt.subplot(3,2,4)
+plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+plt.imshow(np.square(ex_data.transpose()/ex_data.max()), interpolation='spline36', cmap='jet', alpha=0.9)
+
 plt.axis('off')
+plt.show()
+print(ex0_data.min())
+plt.figure()
+
+for i in range(25):
+    plt.subplot(5,5,i+1)
+    plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+    plt.imshow(np.square(ex_data_array[int(99-(i*99/24))].transpose()), interpolation='spline36', cmap='jet', alpha=0.9)
+    plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
 plt.show()
 
 
