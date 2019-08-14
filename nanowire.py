@@ -2,6 +2,7 @@
 import meep as mp
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 import _shapes as shapes
 from scipy.signal import find_peaks
 import h5py
@@ -30,7 +31,7 @@ nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 time_step=0.05           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution =250        # resolution pixels/um (pixels/micrometers)
+resolution =1000        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
@@ -90,7 +91,7 @@ gaussian=mp.Source(mp.GaussianSource(wavelength=w, fwidth=df, cutoff=cutoff),
                      amplitude=-1,
                      size=mp.Vector3(sw,0,0))
 
-pt=mp.Vector3(-sw,0,0) # 1.1*radpoint used to measure decay of Field (in oposite side of the source)
+pt=mp.Vector3(0,sx,0) # 1.1*radpoint used to measure decay of Field (in oposite side of the source)
 
 
 
@@ -137,25 +138,27 @@ sim = mp.Simulation(cell_size=cell,
                     resolution=resolution,
                     Courant=courant)
 
-#1.05112
-#4.55112
-flux_freqsXX=np.linspace(1.051120448179272,4.551120448179272,100)
-dft_objx=[]
-for i in range(nfreq):
-    dft_objx=np.append(dft_objx,sim.add_dft_fields([polarisation], flux_freqsXX[i], flux_freqsXX[i], 1, where=monitor))
-    
-dft_obj = sim.add_dft_fields([mp.Ex], fcen, fcen, 1, where=monitor)
-
 refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t) 
 refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
 refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
 refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
 
+#1.05112
+#4.55112
+flux_freqs = np.array(mp.get_flux_freqs(refl_b))
+
+dft_objx=[]
+for i in range(nfreq):
+    dft_objx=np.append(dft_objx,sim.add_dft_fields([polarisation], flux_freqs[i], flux_freqs[i], 1, where=monitor))
+    
+dft_obj = sim.add_dft_fields([mp.Ex], fcen, fcen, 1, where=monitor)
+
+
 #sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 sim.use_output_directory('flux-out')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         mp.in_volume(monitor, mp.to_appended("ex0", mp.at_every(time_step, mp.output_efield_x))),
-        until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
+        until=23)
 # for normalization run, save flux fields data for reflection plane
 straight_refl_data_t = sim.get_flux_data(refl_t)
 straight_refl_data_b = sim.get_flux_data(refl_b)
@@ -166,7 +169,6 @@ incident_flux = mp.get_fluxes(refl_b)
 incident_flux2 = mp.get_fluxes(refl_t) 
 
 ex0_data = np.real(sim.get_dft_array(dft_obj, polarisation, 0))
-flux_freqsX = np.array(mp.get_flux_freqs(refl_b))
 ex0_data_array = []
 for i in range(nfreq):
     ex0_data_array=np.append(ex0_data_array,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))
@@ -207,8 +209,8 @@ sim.load_minus_flux_data(refl_r, straight_refl_data_r)
 
 #
 dft_objx=[]
-for i in range(len(flux_freqsX)):
-    dft_objx=np.append(dft_objx,sim.add_dft_fields([polarisation], flux_freqsX[i], flux_freqsX[i], 1, where=monitor))
+for i in range(len(flux_freqs)):
+    dft_objx=np.append(dft_objx,sim.add_dft_fields([polarisation], flux_freqs[i], flux_freqs[i], 1, where=monitor))
     
 dft_obj = sim.add_dft_fields([polarisation], fcen, fcen, 1, where=monitor)
 
@@ -216,7 +218,8 @@ dft_obj = sim.add_dft_fields([polarisation], fcen, fcen, 1, where=monitor)
 sim.use_output_directory('flux-out')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         mp.in_volume(monitor, mp.to_appended("ex", mp.at_every(time_step, mp.output_efield_x))),
-        until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
+        #until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay)
+        until=23)
 '''
 sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 '''
@@ -236,14 +239,12 @@ abs_refl_data_r = mp.get_fluxes(arefl_r)
 # save incident power for transmission plane
 
 transmitted_flux = abs_refl_data_b
-flux_freqs = mp.get_flux_freqs(arefl_b)
-
 
 eps_data = sim.get_array(vol=monitor, component=mp.Dielectric)
 ex_data = np.real(sim.get_dft_array(dft_obj, polarisation, 0))
 
 ex_data_array = []
-for i in range(len(flux_freqsX)):
+for i in range(len(flux_freqs)):
     ex_data_array=np.append(ex_data_array,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))
 ex_data_array=ex_data_array.reshape((nfreq,len(eps_data),len(eps_data)))
 
@@ -368,38 +369,55 @@ for i in range(25):
 plt.show()
 
 
-def showMultiple(row,col,esp_data,array):
+def showMultiple(row,col,esp_data,array,title,cmap='jet',log=False):
     plt.figure()
+    plt.title(title)
     for i in range(N):
         plt.subplot(row,col,i+1)
         plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-        plt.imshow(array[i], interpolation='spline36', cmap='jet', alpha=0.9, vmin=array.min(), vmax=array.max())
-        plt.ylabel(str(int(1000/flux_freqs[int(x[i])]))+' nm')
-        plt.colorbar()
+        if log:
+            plt.imshow(array[i], interpolation='spline36', cmap=cmap, alpha=0.9,  norm=colors.LogNorm(vmin=array.min(), vmax=array.max()))
+        else:
+            plt.imshow(array[i], interpolation='spline36', cmap=cmap, alpha=0.9, vmin=array.min(), vmax=array.max())
+            plt.ylabel(str(int(1000/flux_freqs[int(x[i])]))+' nm')
+            plt.colorbar()
     plt.show()
     
-   
+x=np.linspace(99,0,100)
+data_diff=[]
+for i in range(100):
+    data_diff=np.append(data_diff,np.square(ex_data_array[int(x[i])].transpose()-ex0_data_array[int(x[i])].transpose()))
+data_diff=data_diff.reshape((100,len(eps_data),len(eps_data)))
+Fd_file = h5py.File('flux-out/F_response.h5','w')
+Fd_file.create_dataset('fx',data=data_diff.T)
+Fd_file.close()
+plt.figure()
+plt.imshow(data_diff[0], interpolation='spline36', cmap='jet', alpha=0.9, vmin=data_diff.min(), vmax=data_diff.max())
+plt.show()
+
 data2=[]
 data3=[]
 datalog=[]
 row=5
-col=5
+col=10
 N=row*col
-
 x=np.linspace(99,0,N)
 
 for i in range(N):
     data2=np.append(data2,np.square(ex_data_array[int(x[i])].transpose()-ex0_data_array[int(x[i])].transpose()))
-    data3=np.append(data3,np.square(ex_data_array[int(x[i])].transpose())-np.square(ex0_data_array[int(x[i])].T))
+    data3=np.append(data3,ex_data_array[int(x[i])].T-ex0_data_array[int(x[i])].T)
     datalog=np.append(datalog,np.log10(np.square(ex_data_array[int(x[i])].transpose()-ex0_data_array[int(x[i])].transpose())))
     
 data2=data2.reshape((N,len(eps_data),len(eps_data)))
 datalog=datalog.reshape((N,len(eps_data),len(eps_data)))
 data3=data3.reshape((N,len(eps_data),len(eps_data)))
 
-showMultiple(row,col,eps_data,data2)
-showMultiple(row,col,eps_data,data3)
-showMultiple(row,col,eps_data,datalog)
+showMultiple(row,col,eps_data,data2,'(E-E0)**2')
+showMultiple(row,col,eps_data,data3,'(E**2-E0**2)')
+
+showMultiple(row,col,eps_data,abs(datalog),'log10((E-E0)**2)','RdGy',log=True)
+showMultiple(row,col,eps_data,datalog,'log10((E-E0)**2)','RdGy_r')
+
 
 '''
 -------------------------------------
@@ -426,13 +444,14 @@ Ed_file.create_dataset('ex',data=Ed.T)
 Ed_file.close()
 #plot subset of time-snapshots of the difference of electric fields
 plt.figure()
-for i in range(30):    
-    plt.subplot(6,5,i+1)
+plt.title('Time stepped response')
+for i in range(25):    
+    plt.subplot(5,5,i+1)
     plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-    plt.imshow(Ed[60+i], interpolation='spline36', cmap='RdBu', alpha=0.9, vmin=Ed.min(), vmax=Ed.max())
-    #plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
-    #plt.colorbar()
-    plt.axis('off')
+    plt.imshow(Ed[int(i*120/24)], interpolation='spline36', cmap='RdBu', alpha=0.9, vmin=Ed.min(), vmax=Ed.max())
+    plt.ylabel('t= '+str(int(i*120/24)))
+    plt.colorbar()
+    #plt.axis('off')
 plt.show()
 
 '''
