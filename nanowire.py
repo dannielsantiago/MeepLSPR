@@ -29,9 +29,9 @@ sc=6*rad                # source center coordinate shift
 sw=sx0                  # source width, needs to be bigger than inner cell to generate only plane-waves
 nfreq = 200             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
-time_step=0.01           # time step to measure flux
+time_step=0,05           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution =1250        # resolution pixels/um (pixels/micrometers)
+resolution =2000        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
@@ -88,7 +88,7 @@ Gaussian
 gaussian=mp.Source(mp.GaussianSource(wavelength=w, fwidth=df, cutoff=cutoff),
                      component=polarisation,
                      center=mp.Vector3(0,-sx,0),
-                     amplitude=-1,
+                     amplitude=1,
                      size=mp.Vector3(sw,0,0))
 
 pt=mp.Vector3(0,sx,0) # 1.1*radpoint used to measure decay of Field (in oposite side of the source)
@@ -151,7 +151,7 @@ dft_objx=[]
 for i in range(nfreq):
     dft_objx=np.append(dft_objx,sim.add_dft_fields([polarisation], flux_freqs[i], flux_freqs[i], 1, where=monitor))
     
-dft_obj = sim.add_dft_fields([mp.Ex], fcen, fcen, 1, where=monitor)
+dft_obj = sim.add_dft_fields([polarisation], fcen, fcen, 1, where=monitor)
 
 
 #sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
@@ -283,6 +283,15 @@ scat=scat*4*rad*1000
 abso=abso*4*rad*1000
 ext=scat + abso
 
+Fd_file = h5py.File('flux-out/cross-sections-25nm.h5','w')
+Fd_file.create_dataset('wl',data=wl)
+Fd_file.create_dataset('ext',data=ext)
+Fd_file.create_dataset('scat',data=scat)
+Fd_file.create_dataset('abso',data=abso)
+Fd_file.create_dataset('rad',data=rad)
+Fd_file.create_dataset('resolution',data=resolution)
+Fd_file.close()
+
 #peaks, _ = find_peaks(ext, height=max(ext)/2)
 
 '''
@@ -383,13 +392,16 @@ def showMultiple(row,col,esp_data,array,title,cmap='jet',log=False):
             plt.colorbar()
     plt.show()
     
-x=np.linspace(99,0,100)
+x=np.arange(nfreq)
 data_diff=[]
-for i in range(100):
+for i in range(nfreq):
     data_diff=np.append(data_diff,np.square(ex_data_array[int(x[i])].transpose()-ex0_data_array[int(x[i])].transpose()))
-data_diff=data_diff.reshape((100,len(eps_data),len(eps_data)))
+data_diff=data_diff.reshape((nfreq,len(eps_data),len(eps_data)))
+
 Fd_file = h5py.File('flux-out/F_response.h5','w')
-Fd_file.create_dataset('fx',data=data_diff.T)
+Fd_file.create_dataset('FT_diff',data=data_diff.T)
+Fd_file.create_dataset('FT_Ex',data=ex_data_array.T)
+Fd_file.create_dataset('FT_Ex0',data=ex0_data_array.T)
 Fd_file.close()
 
 
@@ -399,11 +411,11 @@ datalog=[]
 row=5
 col=10
 N=row*col
-x=np.linspace(99,0,N)
+x=np.linspace(nfreq-1,0,N)
 
 for i in range(N):
     data2=np.append(data2,np.square(ex_data_array[int(x[i])].transpose()-ex0_data_array[int(x[i])].transpose()))
-    data3=np.append(data3,ex_data_array[int(x[i])].T-ex0_data_array[int(x[i])].T)
+    data3=np.append(data3,np.log10(np.square(ex_data_array[int(x[i])].T-ex0_data_array[int(x[i])].T)))
     datalog=np.append(datalog,np.log10(np.square(ex_data_array[int(x[i])].transpose()-ex0_data_array[int(x[i])].transpose())))
     
 data2=data2.reshape((N,len(eps_data),len(eps_data)))
@@ -411,11 +423,19 @@ datalog=datalog.reshape((N,len(eps_data),len(eps_data)))
 data3=data3.reshape((N,len(eps_data),len(eps_data)))
 
 showMultiple(row,col,eps_data,data2,'(E-E0)**2')
-showMultiple(row,col,eps_data,data3,'(E**2-E0**2)')
+showMultiple(row,col,eps_data,data3,'(E-E0)')
 
 showMultiple(row,col,eps_data,abs(datalog),'log10((E-E0)**2)','RdGy',log=True)
 showMultiple(row,col,eps_data,datalog,'log10((E-E0)**2)','RdGy_r')
 
+
+
+xslice,xpos,ypos=np.unravel_index(data2.argmax(), data2.shape)
+
+plt.figure()
+plt.imshow(data2[xslice], interpolation='spline36', cmap='jet', alpha=0.9, vmin=data2.min(), vmax=data2.max())
+plt.colorbar()
+plt.show()
 
 '''
 -------------------------------------
