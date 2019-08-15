@@ -27,15 +27,15 @@ mx = 8*rad
 fx = 4*rad
 sc=6*rad                # source center coordinate shift
 sw=sx0                  # source width, needs to be bigger than inner cell to generate only plane-waves
-nfreq = 100             # number of frequencies at which to compute flux
+nfreq = 200             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
-time_step=0.05           # time step to measure flux
+time_step=0.01           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution =1000        # resolution pixels/um (pixels/micrometers)
+resolution =1250        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
-
+until=25                #should be above 22 time units
 '''
 
   +--------------------Cell-------------------+
@@ -158,7 +158,7 @@ dft_obj = sim.add_dft_fields([mp.Ex], fcen, fcen, 1, where=monitor)
 sim.use_output_directory('flux-out')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         mp.in_volume(monitor, mp.to_appended("ex0", mp.at_every(time_step, mp.output_efield_x))),
-        until=23)
+        until=until)
 # for normalization run, save flux fields data for reflection plane
 straight_refl_data_t = sim.get_flux_data(refl_t)
 straight_refl_data_b = sim.get_flux_data(refl_b)
@@ -219,7 +219,7 @@ sim.use_output_directory('flux-out')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         mp.in_volume(monitor, mp.to_appended("ex", mp.at_every(time_step, mp.output_efield_x))),
         #until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay)
-        until=23)
+        until=until)
 '''
 sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 '''
@@ -391,9 +391,7 @@ data_diff=data_diff.reshape((100,len(eps_data),len(eps_data)))
 Fd_file = h5py.File('flux-out/F_response.h5','w')
 Fd_file.create_dataset('fx',data=data_diff.T)
 Fd_file.close()
-plt.figure()
-plt.imshow(data_diff[0], interpolation='spline36', cmap='jet', alpha=0.9, vmin=data_diff.min(), vmax=data_diff.max())
-plt.show()
+
 
 data2=[]
 data3=[]
