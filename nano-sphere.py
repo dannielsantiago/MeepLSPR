@@ -23,7 +23,7 @@ w=0.4                  # wavelength
 fcen=1/w                # Pulse center frequency
 df = 3.5                  # pulse width in micrometers
 
-axis=mp.Ex              # Axis of direction of the pulse Ex=TM, Hx=TE
+polarisation=mp.Ex              # Axis of direction of the pulse Ex=TM, Hx=TE
 dpml = w                # Width of th pml layers = wavelength
 
 sx = 14*rad             # Size of inner shell
@@ -45,9 +45,9 @@ courant=0.5            # numerical stability, default is 0.5, should be lower in
 
 time_step=0.1           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution = 250        # resolution pixels/um (pixels/micrometers)
-decay = 1e-9           # decay limit condition for the field measurement
-
+resolution = 1000        # resolution pixels/um (pixels/micrometers)
+decay = 1e-12           # decay limit condition for the field measurement
+until = 23 
 
 cell = mp.Vector3(sx0, sy0, sz0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
@@ -105,11 +105,11 @@ Gaussian
 
 # Defining the sources
 gaussian=mp.Source(mp.GaussianSource(wavelength=w,fwidth=df),
-                     component=axis,
+                     component=polarisation,
                      center=mp.Vector3(0,-sc,0),
                      size=mp.Vector3(sw,0,sw))
 
-pt=mp.Vector3(1.1*rad,0,0) # point used to measure decay of Field (in oposite side of the source)
+pt=mp.Vector3(0,sc,0) # point used to measure decay of Field (in oposite side of the source)
 
 sources = [gaussian]
 
@@ -172,9 +172,10 @@ refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
 refl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
 refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
     
-
-sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
-
+sim.use_output_directory('flux-sph')
+sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
+        mp.in_volume(monitor, mp.to_appended("ex0", mp.at_every(time_step, mp.output_efield_x))),
+        until=until)
 
 # for normalization run, save flux fields data for reflection plane
 straight_refl_data_t = sim.get_flux_data(refl_t)
@@ -230,10 +231,11 @@ sim.load_minus_flux_data(refl_up, straight_refl_data_up)
 sim.load_minus_flux_data(refl_dw, straight_refl_data_dw)
 
 
-sim.use_output_directory('flux-sph_1')
+sim.use_output_directory('flux-sph')
 sim.run(mp.in_volume(monitor2D, mp.at_beginning(mp.output_epsilon)),
-        mp.in_volume(monitor2D, mp.to_appended("ez", mp.at_every(time_step, mp.output_efield_x))),
-        until_after_sources=mp.stop_when_fields_decayed(add_time,axis,pt,decay))
+        mp.in_volume(monitor2D, mp.to_appended("ex", mp.at_every(time_step, mp.output_efield_x))),
+        until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
+        #until=until)
 
 #get reflected flux from the surfaces
 scat_refl_data_t = mp.get_fluxes(refl_t)

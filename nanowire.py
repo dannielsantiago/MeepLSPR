@@ -29,13 +29,13 @@ sc=6*rad                # source center coordinate shift
 sw=sx0                  # source width, needs to be bigger than inner cell to generate only plane-waves
 nfreq = 200             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
-time_step=0,05           # time step to measure flux
+time_step=0.05           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution =2000        # resolution pixels/um (pixels/micrometers)
+resolution =250        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
-until=25                #should be above 22 time units
+until=23                #should be at least 22 time units
 '''
 
   +--------------------Cell-------------------+
@@ -87,11 +87,11 @@ Gaussian
 # Defining the sources, the y-axis is inverted so propagation direction is down
 gaussian=mp.Source(mp.GaussianSource(wavelength=w, fwidth=df, cutoff=cutoff),
                      component=polarisation,
-                     center=mp.Vector3(0,-sx,0),
+                     center=mp.Vector3(0,-sc,0),
                      amplitude=1,
                      size=mp.Vector3(sw,0,0))
 
-pt=mp.Vector3(0,sx,0) # 1.1*radpoint used to measure decay of Field (in oposite side of the source)
+pt=mp.Vector3(0,sc,0) # 1.1*radpoint used to measure decay of Field (in oposite side of the source)
 
 
 
@@ -218,7 +218,7 @@ dft_obj = sim.add_dft_fields([polarisation], fcen, fcen, 1, where=monitor)
 sim.use_output_directory('flux-out')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         mp.in_volume(monitor, mp.to_appended("ex", mp.at_every(time_step, mp.output_efield_x))),
-        #until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay)
+        #until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
         until=until)
 '''
 sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
