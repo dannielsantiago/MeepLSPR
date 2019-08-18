@@ -392,22 +392,24 @@ def showMultiple(array,title,row=5,col=5,cmap='jet',log=False):
             plt.colorbar()
     plt.show()
     
-data_diff=np.square(ex_arr_real-ex0_arr_real)
 
 #save the frequency response in a file
 Fd_file = h5py.File('flux-out/F_response.h5','w')
-Fd_file.create_dataset('FT_diff',data=data_diff.T)
-Fd_file.create_dataset('FT_Ex',data=ex_arr_real.T)
-Fd_file.create_dataset('FT_Ex0',data=ex0_arr_real.T)
+Fd_file.create_dataset('FT_Ex_r',data=ex_arr_real.T)
+Fd_file.create_dataset('FT_Ex_i',data=ex_arr_imag.T)
+
+Fd_file.create_dataset('FT_Ex0_r',data=ex0_arr_real.T)
+Fd_file.create_dataset('FT_Ex0_i',data=ex0_arr_imag.T)
+
 Fd_file.close()
 
-
+data_diff=np.square(ex_arr_real-ex0_arr_real)
 data2=np.square(ex_arr_real-ex0_arr_real)
 data3=np.log10(np.square(ex_arr_real-ex0_arr_real))
 datalog=np.log10(np.square(ex_arr_real-ex0_arr_real))
     
 showMultiple(ex_arr_real,title='Ex_real')
-showMultiple(ex_arr_imag,title='Ex0_imag')
+showMultiple(ex_arr_imag,title='Ex_imag')
 showMultiple(ex0_arr_real,title='Ex0_real')
 showMultiple(ex0_arr_imag,title='Ex0_imag')
 
