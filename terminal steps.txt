@@ -1,4 +1,4 @@
 h5ls E_diff.h5
-h5topng -t 0:119 -R -Zc dkbluered -a yarg -A nanowire-eps-000000000.h5 E_diff.h5
-convert E_diff.t*.png ez.gif
+h5topng -t 0:459 -R -Zc dkbluered -a yarg -A nanowire-eps-000000000.h5 E_diff_c.h5
+convert E_diff_c.t*.png e_complex.gif
 rm *.png

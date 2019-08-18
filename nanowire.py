@@ -135,6 +135,7 @@ sim = mp.Simulation(cell_size=cell,
                     boundary_layers=pml_layers,
                     geometry=[],
                     sources=sources,
+                    force_complex_fields=True,
                     resolution=resolution,
                     Courant=courant)
 
@@ -143,17 +144,14 @@ refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
 refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
 refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
 
-#1.05112
-#4.55112
+#get array of all frequencies used in simulation
 flux_freqs = np.array(mp.get_flux_freqs(refl_b))
 
+#setup of the object in which the freq response will be stored via sim.add_dft_fields for all frequencies used in simulation
 dft_objx=[]
 for i in range(nfreq):
     dft_objx=np.append(dft_objx,sim.add_dft_fields([polarisation], flux_freqs[i], flux_freqs[i], 1, where=monitor))
     
-dft_obj = sim.add_dft_fields([polarisation], fcen, fcen, 1, where=monitor)
-
-
 #sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 sim.use_output_directory('flux-out')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
@@ -165,15 +163,25 @@ straight_refl_data_b = sim.get_flux_data(refl_b)
 straight_refl_data_l = sim.get_flux_data(refl_l)
 straight_refl_data_r = sim.get_flux_data(refl_r)
 
+#get initial flux without particle to compute the ratio against the scattered fluxes with particle
 incident_flux = mp.get_fluxes(refl_b) 
-incident_flux2 = mp.get_fluxes(refl_t) 
 
-ex0_data = np.real(sim.get_dft_array(dft_obj, polarisation, 0))
-ex0_data_array = []
+#get real and imaginary parts of all frequency responses for each frequency 
+ex0_arr_real = []
 for i in range(nfreq):
-    ex0_data_array=np.append(ex0_data_array,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))
-ex0_data_array=ex0_data_array.reshape((nfreq,len(ex0_data),len(ex0_data)))
+    ex0_arr_real=np.append(ex0_arr_real,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))   
+size=int(np.sqrt(len(ex0_arr_real)/nfreq))
+ex0_arr_real=ex0_arr_real.reshape((nfreq,size,size))
 
+ex0_arr_imag = []
+for i in range(len(flux_freqs)):
+    ex0_arr_imag=np.append(ex0_arr_imag,np.imag(sim.get_dft_array(dft_objx[i], polarisation, 0)))
+ex0_arr_imag=ex0_arr_imag.reshape((nfreq,size,size))
+
+ex0_arr_complex=np.zeros_like(ex0_arr_real, dtype=complex)
+ex0_arr_complex.real=ex0_arr_real
+ex0_arr_complex.imag=ex0_arr_imag
+#ex0_arr_complex=ex0_arr_imag*np.conj(ex0_arr_imag)
 
 '''
 ------------------------------------------------
@@ -186,6 +194,7 @@ sim = mp.Simulation(cell_size=cell,
                     boundary_layers=pml_layers,
                     geometry=geometry,
                     sources=sources,
+                    force_complex_fields=True,
                     resolution=resolution,
                     Courant=courant)
 
@@ -207,14 +216,11 @@ sim.load_minus_flux_data(refl_b, straight_refl_data_b)
 sim.load_minus_flux_data(refl_l, straight_refl_data_l)
 sim.load_minus_flux_data(refl_r, straight_refl_data_r)
 
-#
+#setup of the object in which the freq response will be stored via sim.add_dft_fields for all frequencies used in simulation
 dft_objx=[]
 for i in range(len(flux_freqs)):
     dft_objx=np.append(dft_objx,sim.add_dft_fields([polarisation], flux_freqs[i], flux_freqs[i], 1, where=monitor))
     
-dft_obj = sim.add_dft_fields([polarisation], fcen, fcen, 1, where=monitor)
-
-
 sim.use_output_directory('flux-out')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         mp.in_volume(monitor, mp.to_appended("ex", mp.at_every(time_step, mp.output_efield_x))),
@@ -241,14 +247,21 @@ abs_refl_data_r = mp.get_fluxes(arefl_r)
 transmitted_flux = abs_refl_data_b
 
 eps_data = sim.get_array(vol=monitor, component=mp.Dielectric)
-ex_data = np.real(sim.get_dft_array(dft_obj, polarisation, 0))
 
-ex_data_array = []
+ex_arr_real = []
 for i in range(len(flux_freqs)):
-    ex_data_array=np.append(ex_data_array,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))
-ex_data_array=ex_data_array.reshape((nfreq,len(eps_data),len(eps_data)))
+    ex_arr_real=np.append(ex_arr_real,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))
+ex_arr_real=ex_arr_real.reshape((nfreq,size,size))
 
+ex_arr_imag = []
+for i in range(len(flux_freqs)):
+    ex_arr_imag=np.append(ex_arr_imag,np.imag(sim.get_dft_array(dft_objx[i], polarisation, 0)))
+ex_arr_imag=ex_arr_imag.reshape((nfreq,size,size))
 
+ex_arr_complex=np.zeros_like(ex_arr_real, dtype=complex)
+ex_arr_complex.real=ex_arr_real
+ex_arr_complex.imag=ex_arr_imag
+#ex_arr_complex=ex_arr_imag*np.conj(ex_arr_imag)
 '''
 ------------------------------------------------
 Plotting the extintion, scattering and absorbtion
@@ -273,7 +286,7 @@ for i in range(0, nfreq):
     abs_refl_flux = abs(abs_refl_data_t[i] - abs_refl_data_b[i] + abs_refl_data_l[i] - abs_refl_data_r[i])
     abso = np.append(abso, abs_refl_flux/incident_flux[i])
     
-    norm = np.append(norm, incident_flux2[i]/max(incident_flux))
+    norm = np.append(norm, incident_flux[i]/max(incident_flux))
     tran = np.append(tran, transmitted_flux[i]/max(incident_flux))
     scatt = np.append(scatt, scat_refl_data_b[i]/max(incident_flux))
 
@@ -283,6 +296,7 @@ scat=scat*4*rad*1000
 abso=abso*4*rad*1000
 ext=scat + abso
 
+#saving simulation data in external file
 Fd_file = h5py.File('flux-out/cross-sections-25nm.h5','w')
 Fd_file.create_dataset('wl',data=wl)
 Fd_file.create_dataset('ext',data=ext)
@@ -291,8 +305,6 @@ Fd_file.create_dataset('abso',data=abso)
 Fd_file.create_dataset('rad',data=rad)
 Fd_file.create_dataset('resolution',data=resolution)
 Fd_file.close()
-
-#peaks, _ = find_peaks(ext, height=max(ext)/2)
 
 '''
 ---------------------------------
@@ -307,7 +319,6 @@ Section to plot Meep simulation and Analytical response
 ------------------------------------------------------ 
 ''' 
 plt.figure()
-#plt.plot(wl[peaks], ext[peaks], "x")
 plt.plot(wl,scat,'ob',label='scatering')
 plt.plot(wl,abso,'sr',label='absorption')
 plt.plot(wl,ext,'^g', label='extinction')
@@ -361,75 +372,52 @@ Section to plot frequency response
 ---------------------------------- 
 '''
 #FT with particle
-plt.figure()
-for i in range(25):
-    plt.subplot(5,5,i+1)
-    plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-    plt.imshow(np.square(ex_data_array[int(99-(i*99/24))].transpose()), interpolation='spline36', cmap='jet', alpha=0.9)
-    plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
-plt.show()
-#ft without particle
-plt.figure()
-for i in range(25):
-    plt.subplot(5,5,i+1)
-    plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-    plt.imshow(np.square(ex0_data_array[int(99-(i*99/24))].transpose()), interpolation='spline36', cmap='jet', alpha=0.9)
-    plt.ylabel(str(int(1000/flux_freqs[int(99-(i*99/24))]))+' nm')
-plt.show()
+#function to plot an array vs the eps_data(wire) 
+def showMultiple(array,title,row=5,col=5,cmap='jet',log=False):
+    row_=row
+    col_=col
+    N=row_*col_
+    x=np.linspace(nfreq-1,0,N)
 
-
-def showMultiple(row,col,esp_data,array,title,cmap='jet',log=False):
     plt.figure()
-    plt.title(title)
+    plt.suptitle(title)
     for i in range(N):
         plt.subplot(row,col,i+1)
-        plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
+        plt.imshow(eps_data.T, interpolation='spline36', cmap='binary')
         if log:
-            plt.imshow(array[i], interpolation='spline36', cmap=cmap, alpha=0.9,  norm=colors.LogNorm(vmin=array.min(), vmax=array.max()))
+            plt.imshow(array[int(x[i])].T, interpolation='spline36', cmap=cmap, alpha=0.9,  norm=colors.LogNorm(vmin=array.min(), vmax=array.max()))
         else:
-            plt.imshow(array[i], interpolation='spline36', cmap=cmap, alpha=0.9, vmin=array.min(), vmax=array.max())
+            plt.imshow(array[int(x[i])].T, interpolation='spline36', cmap=cmap, alpha=0.9, vmin=array.min(), vmax=array.max())
             plt.ylabel(str(int(1000/flux_freqs[int(x[i])]))+' nm')
             plt.colorbar()
     plt.show()
     
-x=np.arange(nfreq)
-data_diff=[]
-for i in range(nfreq):
-    data_diff=np.append(data_diff,np.square(ex_data_array[int(x[i])].transpose()-ex0_data_array[int(x[i])].transpose()))
-data_diff=data_diff.reshape((nfreq,len(eps_data),len(eps_data)))
+data_diff=np.square(ex_arr_real-ex0_arr_real)
 
+#save the frequency response in a file
 Fd_file = h5py.File('flux-out/F_response.h5','w')
 Fd_file.create_dataset('FT_diff',data=data_diff.T)
-Fd_file.create_dataset('FT_Ex',data=ex_data_array.T)
-Fd_file.create_dataset('FT_Ex0',data=ex0_data_array.T)
+Fd_file.create_dataset('FT_Ex',data=ex_arr_real.T)
+Fd_file.create_dataset('FT_Ex0',data=ex0_arr_real.T)
 Fd_file.close()
 
 
-data2=[]
-data3=[]
-datalog=[]
-row=5
-col=10
-N=row*col
-x=np.linspace(nfreq-1,0,N)
-
-for i in range(N):
-    data2=np.append(data2,np.square(ex_data_array[int(x[i])].transpose()-ex0_data_array[int(x[i])].transpose()))
-    data3=np.append(data3,np.log10(np.square(ex_data_array[int(x[i])].T-ex0_data_array[int(x[i])].T)))
-    datalog=np.append(datalog,np.log10(np.square(ex_data_array[int(x[i])].transpose()-ex0_data_array[int(x[i])].transpose())))
+data2=np.square(ex_arr_real-ex0_arr_real)
+data3=np.log10(np.square(ex_arr_real-ex0_arr_real))
+datalog=np.log10(np.square(ex_arr_real-ex0_arr_real))
     
-data2=data2.reshape((N,len(eps_data),len(eps_data)))
-datalog=datalog.reshape((N,len(eps_data),len(eps_data)))
-data3=data3.reshape((N,len(eps_data),len(eps_data)))
+showMultiple(ex_arr_real,title='Ex_real')
+showMultiple(ex_arr_imag,title='Ex0_imag')
+showMultiple(ex0_arr_real,title='Ex0_real')
+showMultiple(ex0_arr_imag,title='Ex0_imag')
 
-showMultiple(row,col,eps_data,data2,'(E-E0)**2')
-showMultiple(row,col,eps_data,data3,'(E-E0)')
+showMultiple(data3,row=5,col=10,title='(E-E0)')
 
-showMultiple(row,col,eps_data,abs(datalog),'log10((E-E0)**2)','RdGy',log=True)
-showMultiple(row,col,eps_data,datalog,'log10((E-E0)**2)','RdGy_r')
-
+showMultiple(abs(datalog),row=5,col=10,title='log10((E-E0)**2)',cmap='RdGy',log=True)
+showMultiple(datalog,row=5,col=10,title='log10((E-E0)**2)',cmap='RdGy_r')
 
 
+#shows the slice with the maximum value
 xslice,xpos,ypos=np.unravel_index(data2.argmax(), data2.shape)
 
 plt.figure()
@@ -446,23 +434,49 @@ Section to plot time-stepped response
 #load Electric fields generated by the simulation and compute the difference
 E0_file = h5py.File("flux-out/nanowire-ex0.h5")
 E_file = h5py.File("flux-out/nanowire-ex.h5")
+print(list(E0_file))
+print(list(E_file))
 
+E0_r=np.array(E0_file.get('ex.r')).T
+E0_i=np.array(E0_file.get('ex.i')).T
+E0_c=np.zeros_like(E0_r, dtype=complex)
+E0_c.real=E0_r
+E0_c.imag=E0_i
+    
+E_r=np.array(E_file.get('ex.r')).T
+E_i=np.array(E_file.get('ex.i')).T
+E_c=np.zeros_like(E_r, dtype=complex)
+E_c.real=E_r
+E_c.imag=E_i
 
-E0=np.array(E0_file.get('ex')).T
-E=np.array(E_file.get('ex')).T
 #They must be the same size
-print(len(E0[1]))
-print(np.shape(E))
+print(len(E0_r[1]))
+print(np.shape(E0_r[1]))
 E0_file.close()
 E_file.close()
+
 #write in .h5 file the difference of electrics fields than later can be converted to images using terminal commands
-Ed=E-E0
+
+Ed=E_r-E0_r
 Ed_file = h5py.File('flux-out/E_diff.h5','w')
 Ed_file.create_dataset('ex',data=Ed.T)
 Ed_file.close()
+
+Ed=E_c*np.conj(E_c)-E0_c*np.conj(E0_c)
+Ed1=np.real(Ed)
+Ed_file = h5py.File('flux-out/E_diff_c1.h5','w')
+Ed_file.create_dataset('ex',data=Ed1.T)
+Ed_file.close()
+
+Ed=E_c-E0_c
+Ed1=np.real(Ed*np.conj(Ed))
+Ed_file = h5py.File('flux-out/E_diff_c2.h5','w')
+Ed_file.create_dataset('ex',data=Ed1.T)
+Ed_file.close()
+
 #plot subset of time-snapshots of the difference of electric fields
 plt.figure()
-plt.title('Time stepped response')
+plt.suptitle('Time stepped response')
 for i in range(25):    
     plt.subplot(5,5,i+1)
     plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
@@ -472,70 +486,5 @@ for i in range(25):
     #plt.axis('off')
 plt.show()
 
-'''
-
-import h5py
-hf = h5py.File('data.h5', 'a')
-hf.create_dataset('wl', data=wl)
-g1 = hf.create_group('45nm')
-g1.create_dataset('ext', data=ext)
-g1.create_dataset('scat', data=scat)
-g1.create_dataset('abso', data=abso)
-g1.create_dataset('A_ext', data=mat[0:,1])
-g1.create_dataset('A_scat', data=mat[0:,2])
-g1.create_dataset('A_abso', data=mat[0:,3])
-hf.close()
 
 
-
-plot error
-  
-eps_data = sim.get_array(center=mp.Vector3(), size=mp.Vector3(mx,mx,0), component=mp.Dielectric)
-ez_data = sim.get_array(center=mp.Vector3(), size=mp.Vector3(mx,mx,0), component=mp.Ez)
-plt.figure()
-plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-plt.imshow(ez_data.transpose(), interpolation='spline36', cmap='RdBu', alpha=0.9)
-plt.axis('off')
-plt.show()   
-
-'''
-
-'''
-#upper=np.array([mat[0:,1][i]+percentageDifference[i] for i in range(len(ext))]).flatten()
-#lower=np.array([mat[0:,1][i]-percentageDifference[i] for i in range(len(ext))]).flatten()
-from scipy.stats import sem
-sem1=sem(yref)
-upper=np.array([mat[0:,1][i]+2*sem1 for i in range(len(ext))]).flatten()
-lower=np.array([mat[0:,1][i]-2*sem1 for i in range(len(ext))]).flatten()
-
-
-
-#plt.plot(wl,Ag25nmTMext,'o', label='ext 25nm')
-#plt.plot(wl,Ag35nmTMext,'s', label='ext 35nm')
-#plt.plot(wl,ext,'^', label='ext 45nm')
-#plt.plot(mat[0:,0],Ag25nmTMexttheory, '-k', label='Analytical model')
-#plt.plot(mat[0:,0],Ag35nmTMextTheory, '-k')
-#plt.plot(mat[0:,0],mat[0:,1], '-k')
-#plt.fill_between(wl, lower, upper, facecolor='red', alpha=0.5,interpolate=True)
-
-scat_t = np.append(scat_t, abs(scat_refl_data_t[i]/incident_flux[i]))
-    scat_b = np.append(scat_b, abs(scat_refl_data_b[i]/incident_flux[i]))
-    scat_l = np.append(scat_l, abs(scat_refl_data_l[i]/incident_flux[i]))
-    scat_r = np.append(scat_r, abs(scat_refl_data_r[i]/incident_flux[i]))
-
-    abso_t = np.append(abso_t, abs(abs_refl_data_t[i]/incident_flux[i]))
-    abso_b = np.append(abso_b, abs(abs_refl_data_b[i]/incident_flux[i]))
-    abso_l = np.append(abso_l, abs(abs_refl_data_l[i]/incident_flux[i]))
-    abso_r = np.append(abso_r, abs(abs_refl_data_r[i]/incident_flux[i]))
-    
-#plt.plot(wl,abso_t/max(ext),'^r')
-#plt.plot(wl,abso_b/max(ext),'vr')
-#plt.plot(wl,abso_l/max(ext),'<r')
-#plt.plot(wl,abso_r/max(ext),'>r')
-
-#plt.plot(wl,scat_t/max(ext),'^b')
-#plt.plot(wl,scat_b/max(ext),'vb')
-#plt.plot(wl,scat_l/max(ext),'<b')
-#plt.plot(wl,scat_r/max(ext),'>b')
-
-'''
