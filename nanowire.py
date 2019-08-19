@@ -124,7 +124,6 @@ refl_fr_r = mp.FluxRegion(center=mp.Vector3(fx/2,0,0), size=mp.Vector3(0,fx,0))
 
 sources = [gaussian]
 
-   
 '''
 ------------------------------
 1st simulaton without particle and Get normal flux
@@ -138,6 +137,7 @@ sim = mp.Simulation(cell_size=cell,
                     force_complex_fields=True,
                     resolution=resolution,
                     Courant=courant)
+
 
 refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t) 
 refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
@@ -336,7 +336,7 @@ plt.title('Cross-sections of Silver Nanowire of radius %inm and TM polarisation'
 plt.xlabel("wavelength (um)")
 plt.ylabel("cross-section (nm)")
 plt.legend(loc="upper right")  
-plt.axis([0.24, 0.7, 0, max(mat[0:,1])*1.2])
+plt.axis([0.3, 0.7, 0, max(mat[0:,1])*1.2])
 plt.grid(True)
 plt.minorticks_on()
 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
@@ -354,7 +354,7 @@ percentageDifference = (deltaSignal/yref)*100 # Percent by element. *100
 plt.figure()  
 plt.plot(wl,percentageDifference, '--r', label='% error')
 #plt.plot(wl,np.ones(len(wl))*meanPctDiff,'r', label='%.2f%% avg error' %meanPctDiff)
-plt.axis([0.24, 0.7, 0, max(percentageDifference)*1.2])  
+plt.axis([0.3, 0.7, 0, max(percentageDifference)*1.2])  
 plt.grid(True)
 plt.minorticks_on()
 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
@@ -373,12 +373,12 @@ Section to plot frequency response
 '''
 #FT with particle
 #function to plot an array vs the eps_data(wire) 
-def showMultiple(array,title,row=5,col=5,cmap='jet',log=False):
+def showMultiple(array,title,row=5,col=5,cmap='jet',log=False,domain='frequency'):
     row_=row
     col_=col
     N=row_*col_
-    x=np.linspace(nfreq-1,0,N)
-
+    x=np.linspace(len(array)-1,0,N)
+    print(x)
     plt.figure()
     plt.suptitle(title)
     for i in range(N):
@@ -388,8 +388,11 @@ def showMultiple(array,title,row=5,col=5,cmap='jet',log=False):
             plt.imshow(array[int(x[i])].T, interpolation='spline36', cmap=cmap, alpha=0.9,  norm=colors.LogNorm(vmin=array.min(), vmax=array.max()))
         else:
             plt.imshow(array[int(x[i])].T, interpolation='spline36', cmap=cmap, alpha=0.9, vmin=array.min(), vmax=array.max())
+        if domain=='frequency':    
             plt.ylabel(str(int(1000/flux_freqs[int(x[i])]))+' nm')
-            plt.colorbar()
+        elif domain=='time':
+            plt.ylabel('t= '+str(int(i*len(array)/N)))
+        plt.colorbar()
     plt.show()
     
 
@@ -403,29 +406,32 @@ Fd_file.create_dataset('FT_Ex0_i',data=ex0_arr_imag.T)
 
 Fd_file.close()
 
-data_diff=np.square(ex_arr_real-ex0_arr_real)
-data2=np.square(ex_arr_real-ex0_arr_real)
-data3=np.log10(np.square(ex_arr_real-ex0_arr_real))
-datalog=np.log10(np.square(ex_arr_real-ex0_arr_real))
+data_diff=np.real((ex_arr_complex-ex0_arr_complex)*np.conj(ex_arr_complex-ex0_arr_complex))
+data_diff2=np.real(ex0_arr_complex*np.conj(ex0_arr_complex))
+data_diff3=data_diff/data_diff2
+data_diff4=np.log10(np.square(data_diff3))
+
     
-showMultiple(ex_arr_real,title='Ex_real')
-showMultiple(ex_arr_imag,title='Ex_imag')
-showMultiple(ex0_arr_real,title='Ex0_real')
-showMultiple(ex0_arr_imag,title='Ex0_imag')
-
-showMultiple(data3,row=5,col=10,title='(E-E0)')
-
-showMultiple(abs(datalog),row=5,col=10,title='log10((E-E0)**2)',cmap='RdGy',log=True)
-showMultiple(datalog,row=5,col=10,title='log10((E-E0)**2)',cmap='RdGy_r')
+#showMultiple(data_diff,title='Ex_c*cc')
+#showMultiple(data_diff2,title='Ex0_c*cc')
+#showMultiple(data_diff3,title='Ex_c*cc/Ex0_c*cc')
+showMultiple(data_diff4,title='log10((Ex_c*cc/Ex0_c*cc)**2)')
 
 
-#shows the slice with the maximum value
-xslice,xpos,ypos=np.unravel_index(data2.argmax(), data2.shape)
+def showMaxSlice(array,title,cmap='jet'):
+    #shows the slice with the maximum value
+    xslice,xpos,ypos=np.unravel_index(array.argmax(), array.shape)
+    plt.figure()
+    plt.suptitle(title)
+    plt.imshow(array[xslice].T, interpolation='spline36', cmap=cmap, vmin=array.min(), vmax=array.max())
+    plt.colorbar()
+    plt.show()
 
-plt.figure()
-plt.imshow(data2[xslice], interpolation='spline36', cmap='jet', alpha=0.9, vmin=data2.min(), vmax=data2.max())
-plt.colorbar()
-plt.show()
+showMaxSlice(data_diff,title='Ex_c*cc')
+showMaxSlice(data_diff2,title='Ex0_c*cc')
+showMaxSlice(data_diff3,title='Ex_c*cc/Ex0_c*cc')
+showMaxSlice(data_diff4,title='log10((Ex_c*cc/Ex0_c*cc)**2)')
+
 
 '''
 -------------------------------------
@@ -463,7 +469,7 @@ Ed=E_r-E0_r
 Ed_file = h5py.File('flux-out/E_diff.h5','w')
 Ed_file.create_dataset('ex',data=Ed.T)
 Ed_file.close()
-
+showMaxSlice(Ed,title='time response',cmap='RdBu')
 Ed=E_c*np.conj(E_c)-E0_c*np.conj(E0_c)
 Ed1=np.real(Ed)
 Ed_file = h5py.File('flux-out/E_diff_c1.h5','w')
@@ -479,14 +485,16 @@ Ed_file.close()
 #plot subset of time-snapshots of the difference of electric fields
 plt.figure()
 plt.suptitle('Time stepped response')
-for i in range(25):    
+for i in range(25):  
+    print(int(i*120/24))
     plt.subplot(5,5,i+1)
     plt.imshow(eps_data.transpose(), interpolation='spline36', cmap='binary')
-    plt.imshow(Ed[int(i*120/24)], interpolation='spline36', cmap='RdBu', alpha=0.9, vmin=Ed.min(), vmax=Ed.max())
+    plt.imshow(Ed1[int(i*120/24)], interpolation='spline36', cmap='RdBu_r', alpha=0.9, vmin=Ed1.min(), vmax=Ed1.max())
     plt.ylabel('t= '+str(int(i*120/24)))
     plt.colorbar()
     #plt.axis('off')
 plt.show()
 
+showMaxSlice(Ed1,title='time response',cmap='RdBu')
 
 
