@@ -320,7 +320,7 @@ Section to plot Meep simulation and Analytical response
 ''' 
 plt.figure()
 plt.plot(wl,scat,'ob',label='scatering')
-plt.plot(wl,abso,'sr',label='absorption')
+plt.plot(wl,abso,'s',color='orange',label='absorption')
 plt.plot(wl,ext,'^g', label='extinction')
 
 plt.plot(mat[0:,0],mat[0:,1], '-k', label='Analytical model')
@@ -363,9 +363,9 @@ plt.ylabel('% error', color='r')
 plt.tick_params('y', colors='r')
 #plt.legend(loc="center right")  
 plt.show()
+print(np.mean(percentageDifference))
 
-
-
+print(percentageDifference.max())
 '''
 -----------------------------------
 Section to plot frequency response
@@ -377,25 +377,26 @@ def showMultiple(array,title,row=5,col=5,cmap='jet',log=False,domain='frequency'
     row_=row
     col_=col
     N=row_*col_
-    x=np.linspace(len(array)-1,0,N)
+    x=np.linspace(70,134,N)
     print(x)
     plt.figure()
-    plt.suptitle(title)
+    #plt.suptitle(title)
     for i in range(N):
         plt.subplot(row,col,i+1)
-        plt.imshow(eps_data.T, interpolation='spline36', cmap='binary')
+        #plt.imshow(eps_data.T, interpolation='spline36', cmap='binary')
         if log:
             plt.imshow(array[int(x[i])].T, interpolation='spline36', cmap=cmap, alpha=0.9,  norm=colors.LogNorm(vmin=array.min(), vmax=array.max()))
         else:
-            plt.imshow(array[int(x[i])].T, interpolation='spline36', cmap=cmap, alpha=0.9, vmin=array.min(), vmax=array.max())
+            plt.imshow(array[int(x[i])].T, interpolation='spline36', cmap=cmap, alpha=0.9, vmin=array.min(), vmax=10)
         if domain=='frequency':    
-            plt.ylabel(str(int(1000/flux_freqs[int(x[i])]))+' nm')
+            plt.ylabel(str(int(wl_r[int(x[i])]*1000))+' nm')
         elif domain=='time':
             plt.ylabel('t= '+str(int(i*len(array)/N)))
-        plt.colorbar()
+        #plt.colorbar()
+        #plt.axis('off')
     plt.show()
     
-
+'''
 #save the frequency response in a file
 Fd_file = h5py.File('flux-out/F_response.h5','w')
 Fd_file.create_dataset('FT_Ex_r',data=ex_arr_real.T)
@@ -405,14 +406,17 @@ Fd_file.create_dataset('FT_Ex0_r',data=ex0_arr_real.T)
 Fd_file.create_dataset('FT_Ex0_i',data=ex0_arr_imag.T)
 
 Fd_file.close()
+'''
 
-data_diff=np.real((ex_arr_complex-ex0_arr_complex)*np.conj(ex_arr_complex-ex0_arr_complex))
+data_diff=np.real(ex_arr_complex*np.conj(ex_arr_complex))
 data_diff2=np.real(ex0_arr_complex*np.conj(ex0_arr_complex))
 data_diff3=data_diff/data_diff2
 data_diff4=np.log10(np.square(data_diff3))
 
     
-#showMultiple(data_diff,title='Ex_c*cc')
+showMultiple(data_diff3,title='Ex_c*cc')
+showMultiple(data_diff3,row=3, col=3,title='Ex_c*cc')
+
 #showMultiple(data_diff2,title='Ex0_c*cc')
 #showMultiple(data_diff3,title='Ex_c*cc/Ex0_c*cc')
 showMultiple(data_diff4,title='log10((Ex_c*cc/Ex0_c*cc)**2)')
@@ -421,17 +425,20 @@ showMultiple(data_diff4,title='log10((Ex_c*cc/Ex0_c*cc)**2)')
 def showMaxSlice(array,title,cmap='jet'):
     #shows the slice with the maximum value
     xslice,xpos,ypos=np.unravel_index(array.argmax(), array.shape)
+    print(xslice)
     plt.figure()
     plt.suptitle(title)
-    plt.imshow(array[xslice].T, interpolation='spline36', cmap=cmap, vmin=array.min(), vmax=array.max())
+    plt.imshow(array[105].T, interpolation='spline36', cmap=cmap, vmin=array.min(), vmax=10)
     plt.colorbar()
     plt.show()
 
-showMaxSlice(data_diff,title='Ex_c*cc')
-showMaxSlice(data_diff2,title='Ex0_c*cc')
+#showMaxSlice(data_diff,title='Ex_c*cc')
+
+#showMaxSlice(data_diff2,title='Ex0_c*cc')
 showMaxSlice(data_diff3,title='Ex_c*cc/Ex0_c*cc')
 showMaxSlice(data_diff4,title='log10((Ex_c*cc/Ex0_c*cc)**2)')
-
+wl_r=wl[::-1]
+print(wl_r[90])
 
 '''
 -------------------------------------
