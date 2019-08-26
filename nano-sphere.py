@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import _shapes as shapes
 from coreShell import c_coreshell
+import h5py
 
 
 
@@ -24,7 +25,7 @@ fcen=1/w                # Pulse center frequency
 df = 3.5                  # pulse width in micrometers
 
 polarisation=mp.Ex              # Axis of direction of the pulse Ex=TM, Hx=TE
-dpml = w                # Width of th pml layers = wavelength
+dpml = 1                # Width of th pml layers = wavelength
 
 sx = 14*rad             # Size of inner shell
 sy = 14*rad             # Size of inner shell
@@ -45,13 +46,12 @@ courant=0.5            # numerical stability, default is 0.5, should be lower in
 
 time_step=0.1           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution = 1000        # resolution pixels/um (pixels/micrometers)
+resolution = 500        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 until = 23 
 
 cell = mp.Vector3(sx0, sy0, sz0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
-monitor2D = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(0,mx,mx))
 
 
 #Inside the geometry object, the device structure is specified together with its center and the type of the material used
@@ -174,8 +174,7 @@ refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
     
 sim.use_output_directory('flux-sph')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
-        mp.in_volume(monitor, mp.to_appended("ex0", mp.at_every(time_step, mp.output_efield_x))),
-        until=until)
+        until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 
 # for normalization run, save flux fields data for reflection plane
 straight_refl_data_t = sim.get_flux_data(refl_t)
@@ -232,8 +231,7 @@ sim.load_minus_flux_data(refl_dw, straight_refl_data_dw)
 
 
 sim.use_output_directory('flux-sph')
-sim.run(mp.in_volume(monitor2D, mp.at_beginning(mp.output_epsilon)),
-        mp.in_volume(monitor2D, mp.to_appended("ex", mp.at_every(time_step, mp.output_efield_x))),
+sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
         #until=until)
 
@@ -283,6 +281,17 @@ for i in range(0, nfreq):
 scat=scat*rad*rad*10000
 abso=abso*rad*rad*10000
 ext=scat + abso
+
+#saving simulation data in external file
+Fd_file = h5py.File('flux-sph/cross-sections-25nm.h5','w')
+Fd_file.create_dataset('wl',data=wl)
+Fd_file.create_dataset('ext',data=ext)
+Fd_file.create_dataset('scat',data=scat)
+Fd_file.create_dataset('abso',data=abso)
+Fd_file.create_dataset('rad',data=rad)
+Fd_file.create_dataset('resolution',data=resolution)
+Fd_file.close()
+
 
 plt.figure()
 plt.plot(wl,scat,'ob',label='scatering')
