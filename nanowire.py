@@ -13,12 +13,12 @@ import c_wire90 as theoretical
 ------------------------Parameters of the simulation
 '''
 rad=shapes.rad
-w=0.45                  # wavelength
+w=0.43                  # wavelength
 fcen=1/w                # Pulse center frequency
-df = 3                # 3,5pulse frequency width 
-cutoff=10
+df = 1.8                # 3,5pulse frequency width 
+cutoff=5
 polarisation=mp.Ex      # Axis of direction of the pulse Ex=TM, Hx=TE
-dpml = 1.38462          # Width of th pml layers = wavelength
+dpml = 0.7015/2          # Width of th pml layers = wavelength
 sx = 14*rad             # Size of inner shell
 sy = 14*rad             # Size of inner shell
 sx0 = sx + 2*dpml       # size of cell in X direction
@@ -30,7 +30,7 @@ sw=sx0                  # source width, needs to be bigger than inner cell to ge
 nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 time_step=0.05           # time step to measure flux
-add_time=2             # additional time until field decays 1e-6
+add_time=2.0             # additional time until field decays 1e-6
 resolution =500        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
@@ -307,6 +307,7 @@ scat=scat*4*rad*1000
 abso=abso*4*rad*1000
 ext=scat + abso
 
+
 #saving simulation data in external file
 Fd_file = h5py.File('flux-out/cross-sections-25nm.h5','w')
 Fd_file.create_dataset('wl',data=wl)
@@ -338,10 +339,11 @@ plt.plot(mat[0:,0],mat[0:,3], '-', label='Analytical model')
 plt.plot(mat[0:,0],mat[0:,2], '-')
 plt.plot(mat[0:,0],mat[0:,1], '-')
 
-#plt.plot(wl,norm*100, '-', label='incident pulse', linestyle='--')
-#plt.plot(wl,tran, '-', label='transmitted pulse', linestyle='--')
-#plt.plot(wl,scatt, '-', label='scatt pulse', linestyle='--')
-
+plt.plot(wl,norm**20*100, '-', label='incident pulse', linestyle='--')
+'''
+plt.plot(wl,tran*100, '-', label='transmitted pulse', linestyle='--')
+plt.plot(wl,scatt*100, '-', label='scatt pulse', linestyle='--')
+'''
 radx=rad*1000
 plt.title('Cross-sections of Silver Nanowire of radius %inm and TM polarisation' %radx)
 plt.xlabel("wavelength (um)")
