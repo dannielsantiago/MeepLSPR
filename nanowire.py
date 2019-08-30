@@ -19,24 +19,25 @@ df = 1.8                # 3,5pulse frequency width
 cutoff=5
 polarisation=mp.Ex      # Axis of direction of the pulse Ex=TM, Hx=TE
 dpml = 0.7015/2          # Width of th pml layers = wavelength
-sx = 14*rad             # Size of inner shell
-sy = 14*rad             # Size of inner shell
-sx0 = sx + 2*dpml       # size of cell in X direction
-sy0 = sy + 2*dpml       # size of cell in Y direction
+
 mx = 8*rad
 fx = 4*rad
-sc=6*rad                # source center coordinate shift
+sx = mx+0.01             # Size of inner shell
+sy = sx             # Size of inner shell
+sx0 = sx + 2*dpml       # size of cell in X direction
+sy0 = sy + 2*dpml       # size of cell in Y direction
+sc=mx/2 + 0.005                # source center coordinate shift
 sw=sx0                  # source width, needs to be bigger than inner cell to generate only plane-waves
+
 nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 time_step=0.05           # time step to measure flux
 add_time=2.0             # additional time until field decays 1e-6
-resolution =500        # resolution pixels/um (pixels/micrometers)
+resolution =1000        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
-until=23                #should be at least 22 time units
-f_response=False
+f_response=True
 t_response=False
 '''
 
@@ -73,7 +74,7 @@ t_response=False
 #Inside the geometry object, the device structure is specified together with its center and the type of the material used
 water = mp.Block(center=mp.Vector3(0,0,0), size=mp.Vector3(sx0,sy0,sx0), material=mp.Medium(epsilon=1.77))
 
-geometry = [water,shapes.cyl]
+geometry = [shapes.cyl]
 
 #Boundary conditions using Perfectly Maching Layers PML// ficticius absorbtion material to avoid reflection of the fields
 pml_layers = [mp.PML(dpml)]
@@ -136,7 +137,7 @@ sources = [gaussian]
 
 sim = mp.Simulation(cell_size=cell,
                     boundary_layers=pml_layers,
-                    geometry=[water],
+                    geometry=[],
                     sources=sources,
                     force_complex_fields=True,
                     resolution=resolution,
@@ -324,7 +325,7 @@ Fd_file.close()
 check c_wire90.py for instructions
 ---------------------------------
 '''
-mat=theoretical.C_wire90(wl*1000,'Ag',1.33,shapes.rad*1000,16,'TM')
+mat=theoretical.C_wire90(wl*1000,'Ag',1.0,shapes.rad*1000,16,'TM')
 '''
 ------------------------------------------------------
 Section to plot Meep simulation and Analytical response 
@@ -392,7 +393,7 @@ if(f_response):
         row_=row
         col_=col
         N=row_*col_
-        x=np.linspace(70,134,N)
+        x=np.linspace(0,99,N)
         print(x)
         plt.figure()
         #plt.suptitle(title)
@@ -411,9 +412,9 @@ if(f_response):
             #plt.axis('off')
         plt.show()
         
-    '''
+    
     #save the frequency response in a file
-    Fd_file = h5py.File('flux-out/F_response.h5','w')
+    Fd_file = h5py.File('flux-out/F_response_1000res-50nm.h5','w')
     Fd_file.create_dataset('FT_Ex_r',data=ex_arr_real.T)
     Fd_file.create_dataset('FT_Ex_i',data=ex_arr_imag.T)
     
@@ -421,20 +422,17 @@ if(f_response):
     Fd_file.create_dataset('FT_Ex0_i',data=ex0_arr_imag.T)
     
     Fd_file.close()
-    '''
+    
     
     data_diff=np.real(ex_arr_complex*np.conj(ex_arr_complex))
     data_diff2=np.real(ex0_arr_complex*np.conj(ex0_arr_complex))
     data_diff3=data_diff/data_diff2
-    data_diff4=np.log10(np.square(data_diff3))
     
-        
     showMultiple(data_diff3,title='Ex_c*cc')
     showMultiple(data_diff3,row=3, col=3,title='Ex_c*cc')
     
     #showMultiple(data_diff2,title='Ex0_c*cc')
     #showMultiple(data_diff3,title='Ex_c*cc/Ex0_c*cc')
-    showMultiple(data_diff4,title='log10((Ex_c*cc/Ex0_c*cc)**2)')
     
     
     def showMaxSlice(array,title,cmap='jet'):
@@ -443,7 +441,7 @@ if(f_response):
         print(xslice)
         plt.figure()
         plt.suptitle(title)
-        plt.imshow(array[105].T, interpolation='spline36', cmap=cmap, vmin=array.min(), vmax=10)
+        plt.imshow(array[xslice].T, interpolation='spline36', cmap=cmap, vmin=array.min(), vmax=10)
         plt.colorbar()
         plt.show()
     
@@ -451,7 +449,6 @@ if(f_response):
     
     #showMaxSlice(data_diff2,title='Ex0_c*cc')
     showMaxSlice(data_diff3,title='Ex_c*cc/Ex0_c*cc')
-    showMaxSlice(data_diff4,title='log10((Ex_c*cc/Ex0_c*cc)**2)')
 
 
 '''

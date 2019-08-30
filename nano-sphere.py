@@ -10,8 +10,10 @@ Created on Tue May  7 17:19:54 2019
 import meep as mp
 import numpy as np
 import matplotlib.pyplot as plt
-import _shapes as shapes
+#import _shapes as shapes
 from coreShell import c_coreshell
+from materials_library import Ag, Au, cSi, myAg
+
 import h5py
 
 
@@ -19,26 +21,26 @@ import h5py
 '''
 ------------------------Parameters of the simulation
 '''
-rad=shapes.rad
-w=0.4                  # wavelength
+rad=0.025
+w=0.43                  # wavelength
 fcen=1/w                # Pulse center frequency
-df = 3.5                  # pulse width in micrometers
+df = 1.8                  # pulse width in micrometers
 
 polarisation=mp.Ex              # Axis of direction of the pulse Ex=TM, Hx=TE
-dpml = 1                # Width of th pml layers = wavelength
+dpml = 0.7015/2                # Width of th pml layers = wavelength
 
-sx = 14*rad             # Size of inner shell
-sy = 14*rad             # Size of inner shell
-sz = 14*rad             # Size of inner shell
+mx = 8*rad              # size of monitor box side
+fx = 4*rad              # size of flux box side
+
+sx = mx+0.01             # Size of inner shell
+sy = mx+0.01             # Size of inner shell
+sz = mx+0.01             # Size of inner shell
 
 sx0 = sx + 2*dpml       # size of cell in X direction
 sy0 = sy + 2*dpml       # size of cell in Y direction
 sz0 = sz + 2*dpml       # size of cell in z direction
 
-mx = 8*rad              # size of monitor box side
-fx = 4*rad              # size of flux box side
-
-sc=6*rad                # source center coordinate shift
+sc=mx/2 + 0.005           # source center coordinate shift
 sw=sx0                  # source width, needs to be bigger than inner cell to generate only plane-waves
 
 nfreq = 100             # number of frequencies at which to compute flux
@@ -46,16 +48,26 @@ courant=0.5            # numerical stability, default is 0.5, should be lower in
 
 time_step=0.1           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution = 500        # resolution pixels/um (pixels/micrometers)
+resolution = 600        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
-until = 23 
 
 cell = mp.Vector3(sx0, sy0, sz0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
 
 
 #Inside the geometry object, the device structure is specified together with its center and the type of the material used
-geometry = [shapes.sph]
+def sph_resonator(p):
+    rr = (p.x**2+p.y**2)**0.5
+    if (rr < rad):
+        return Ag
+    return mp.air
+
+sph_resonator.do_averaging = True
+
+geometry = [mp.Block(center=mp.Vector3(),
+                     size=mp.Vector3(sx0,sx0,sx0),
+                     material=sph_resonator)]
+#geometry = [shapes.sph]
 
 #Boundary conditions using Perfectly Maching Layers PML// ficticius absorbtion material to avoid reflection of the fields
 pml_layers = [mp.PML(dpml)]
@@ -160,6 +172,8 @@ refl_fr_dw = mp.FluxRegion(center=mp.Vector3(0,0,-fx/2), size=mp.Vector3(fx,fx,0
 sim = mp.Simulation(cell_size=cell,
                     boundary_layers=pml_layers,
                     geometry=[],
+                    subpixel_tol=1e-4,
+                    subpixel_maxeval=1000,
                     sources=sources,
                     resolution=resolution,
                     Courant=courant)
@@ -172,7 +186,7 @@ refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
 refl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
 refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
     
-sim.use_output_directory('flux-sph')
+sim.use_output_directory('flux-sph600')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 
@@ -198,6 +212,8 @@ sim.reset_meep()
 sim = mp.Simulation(cell_size=cell,
                     boundary_layers=pml_layers,
                     geometry=geometry,
+                    subpixel_tol=1e-4,
+                    subpixel_maxeval=1000,
                     sources=sources,
                     resolution=resolution,
                     Courant=courant)
@@ -230,7 +246,7 @@ sim.load_minus_flux_data(refl_up, straight_refl_data_up)
 sim.load_minus_flux_data(refl_dw, straight_refl_data_dw)
 
 
-sim.use_output_directory('flux-sph')
+sim.use_output_directory('flux-sph600')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
         #until=until)
@@ -283,7 +299,7 @@ abso=abso*rad*rad*10000
 ext=scat + abso
 
 #saving simulation data in external file
-Fd_file = h5py.File('flux-sph/cross-sections-25nm.h5','w')
+Fd_file = h5py.File('flux-sph/cross-sections-25nm600.h5','w')
 Fd_file.create_dataset('wl',data=wl)
 Fd_file.create_dataset('ext',data=ext)
 Fd_file.create_dataset('scat',data=scat)
