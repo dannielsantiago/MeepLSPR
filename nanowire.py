@@ -33,7 +33,7 @@ nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 time_step=0.05           # time step to measure flux
 add_time=2.0             # additional time until field decays 1e-6
-resolution =1000        # resolution pixels/um (pixels/micrometers)
+resolution =250        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
@@ -104,9 +104,6 @@ pt=mp.Vector3(0,sc,0) # 1.1*radpoint used to measure decay of Field (in oposite 
 -------------------------------
 Regions for the flux measurement 
 -------------------------------
-
-                    source
-               +---------------+
                     
                    refl_fr_t
                +---------------+
@@ -120,10 +117,12 @@ Regions for the flux measurement
                +---------------+
                    refl_fr_b
             
+                    source
+               +---------------+
 '''
 # reflected flux / Regions (top,bottom,left,right)
-refl_fr_t = mp.FluxRegion(center=mp.Vector3(0,-fx/2,0), size=mp.Vector3(fx,0,0)) # usado para normalizar tambien
-refl_fr_b = mp.FluxRegion(center=mp.Vector3(0,fx/2,0), size=mp.Vector3(fx,0,0))
+refl_fr_t = mp.FluxRegion(center=mp.Vector3(0,fx/2,0), size=mp.Vector3(fx,0,0)) # usado para normalizar tambien
+refl_fr_b = mp.FluxRegion(center=mp.Vector3(0,-fx/2,0), size=mp.Vector3(fx,0,0))
 refl_fr_l = mp.FluxRegion(center=mp.Vector3(-fx/2,0,0), size=mp.Vector3(0,fx,0))
 refl_fr_r = mp.FluxRegion(center=mp.Vector3(fx/2,0,0), size=mp.Vector3(0,fx,0))
 
@@ -173,7 +172,11 @@ straight_refl_data_l = sim.get_flux_data(refl_l)
 straight_refl_data_r = sim.get_flux_data(refl_r)
 
 #get initial flux without particle to compute the ratio against the scattered fluxes with particle
-incident_flux = mp.get_fluxes(refl_b) 
+incident_flux_b = np.array(mp.get_fluxes(refl_b))
+incident_flux_t = np.array(mp.get_fluxes(refl_t)) 
+incident_flux_l = np.array(mp.get_fluxes(refl_l))
+incident_flur_r = np.array(mp.get_fluxes(refl_r))
+
 
 if(f_response):
     #get real and imaginary parts of all frequency responses for each frequency 
@@ -191,6 +194,8 @@ if(f_response):
     ex0_arr_complex=np.zeros_like(ex0_arr_real, dtype=complex)
     ex0_arr_complex.real=ex0_arr_real
     ex0_arr_complex.imag=ex0_arr_imag
+    del ex0_arr_real
+    del ex0_arr_imag
     #ex0_arr_complex=ex0_arr_imag*np.conj(ex0_arr_imag)
 
 '''
@@ -242,20 +247,20 @@ sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt
 '''
 
 #save scattered reflected flux from the surfaces
-scat_refl_data_t = mp.get_fluxes(refl_t)
-scat_refl_data_b = mp.get_fluxes(refl_b)
-scat_refl_data_l = mp.get_fluxes(refl_l)
-scat_refl_data_r = mp.get_fluxes(refl_r)
+scat_refl_data_t = np.array(mp.get_fluxes(refl_t))
+scat_refl_data_b = np.array(mp.get_fluxes(refl_b))
+scat_refl_data_l = np.array(mp.get_fluxes(refl_l))
+scat_refl_data_r = np.array(mp.get_fluxes(refl_r))
 
 #trans_flux_structure_abs.dat
-abs_refl_data_t = mp.get_fluxes(arefl_t)
-abs_refl_data_b = mp.get_fluxes(arefl_b)
-abs_refl_data_l = mp.get_fluxes(arefl_l)
-abs_refl_data_r = mp.get_fluxes(arefl_r)
+abso_refl_data_t = np.array(mp.get_fluxes(arefl_t))
+abso_refl_data_b = np.array(mp.get_fluxes(arefl_b))
+abso_refl_data_l = np.array(mp.get_fluxes(arefl_l))
+abso_refl_data_r = np.array(mp.get_fluxes(arefl_r))
 
 # save incident power for transmission plane
 
-transmitted_flux = abs_refl_data_b
+transmitted_flux = abso_refl_data_b
 
 eps_data = sim.get_array(vol=monitor, component=mp.Dielectric)
 
@@ -273,44 +278,23 @@ if(f_response):
     ex_arr_complex=np.zeros_like(ex_arr_real, dtype=complex)
     ex_arr_complex.real=ex_arr_real
     ex_arr_complex.imag=ex_arr_imag
-    #ex_arr_complex=ex_arr_imag*np.conj(ex_arr_imag)
+    del ex_arr_real
+    del ex_arr_imag
 '''
 ------------------------------------------------
 Plotting the extintion, scattering and absorbtion
 ------------------------------------------------
 '''
-wl = []
-scat = []
-abso = []
-norm = []
-tran=[]
-scatt=[]
-ext=[]
-mat=[]
-
-
-for i in range(0, nfreq):
-    wl = np.append(wl, 1/flux_freqs[i]) # constructs the x axis wavelength
-
-    scat_refl_flux = abs(scat_refl_data_t[i] - scat_refl_data_b[i] + scat_refl_data_l[i]- scat_refl_data_r[i])
-    scat = np.append(scat, scat_refl_flux/incident_flux[i])
-
-    abs_refl_flux = abs(abs_refl_data_t[i] - abs_refl_data_b[i] + abs_refl_data_l[i] - abs_refl_data_r[i])
-    abso = np.append(abso, abs_refl_flux/incident_flux[i])
-    
-    norm = np.append(norm, incident_flux[i]/max(incident_flux))
-    tran = np.append(tran, transmitted_flux[i]/max(incident_flux))
-    scatt = np.append(scatt, scat_refl_data_b[i]/max(incident_flux))
-
-#multily for area (lenght in this case) of the sides to get the crossection in nm,
-# area=4*rad=100 nm
-scat=scat*4*rad*1000
-abso=abso*4*rad*1000
+wl = 1/flux_freqs
+incidentPow=incident_flux_b/(4*rad*1000)
+scat=abs(scat_refl_data_t-scat_refl_data_b+scat_refl_data_r-scat_refl_data_l)/incidentPow
+abso=abs(abso_refl_data_t-abso_refl_data_b+abso_refl_data_r-abso_refl_data_l)/incidentPow
 ext=scat + abso
+norm=incidentPow/incidentPow.max()
 
 
 #saving simulation data in external file
-Fd_file = h5py.File('flux-out/cross-sections-25nm.h5','w')
+Fd_file = h5py.File('flux-out/cross-sections-50nm.h5','w')
 Fd_file.create_dataset('wl',data=wl)
 Fd_file.create_dataset('ext',data=ext)
 Fd_file.create_dataset('scat',data=scat)
@@ -341,16 +325,13 @@ plt.plot(mat[0:,0],mat[0:,2], '-')
 plt.plot(mat[0:,0],mat[0:,1], '-')
 
 plt.plot(wl,norm**20*100, '-', label='incident pulse', linestyle='--')
-'''
-plt.plot(wl,tran*100, '-', label='transmitted pulse', linestyle='--')
-plt.plot(wl,scatt*100, '-', label='scatt pulse', linestyle='--')
-'''
+
 radx=rad*1000
 plt.title('Cross-sections of Silver Nanowire of radius %inm and TM polarisation' %radx)
 plt.xlabel("wavelength (um)")
 plt.ylabel("cross-section (nm)")
 plt.legend(loc="upper right")  
-plt.axis([0.3, 0.7, 0, max(mat[0:,1])*1.2])
+plt.axis([0.31, 0.7, 0, max(mat[0:,1])*1.2])
 plt.grid(True)
 plt.minorticks_on()
 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
@@ -360,15 +341,14 @@ plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
 Section to plot fiting error 
 ------------------------------
 '''        
-y=np.array(ext)[np.newaxis].T
+y=ext.reshape(100,1)
 yref=mat[0:,1]
 
-deltaSignal = abs(y - yref)
-percentageDifference = (deltaSignal/yref)*100 # Percent by element. *100
+error = (abs(y - yref)/yref)*100 # Percent by element. *100
 plt.figure()  
-plt.plot(wl,percentageDifference, '--r', label='% error')
+plt.plot(wl,error, '--r', label='% error')
 #plt.plot(wl,np.ones(len(wl))*meanPctDiff,'r', label='%.2f%% avg error' %meanPctDiff)
-plt.axis([0.3, 0.7, 0, max(percentageDifference)*1.2])  
+plt.axis([0.3, 0.7, 0, max(error)*1.2])  
 plt.grid(True)
 plt.minorticks_on()
 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
@@ -377,9 +357,8 @@ plt.ylabel('% error', color='r')
 plt.tick_params('y', colors='r')
 #plt.legend(loc="center right")  
 plt.show()
-print(np.mean(percentageDifference))
-
-print(percentageDifference.max())
+print('mean error')
+print(np.mean(error))
 '''
 -----------------------------------
 Section to plot frequency response
@@ -412,29 +391,6 @@ if(f_response):
             #plt.axis('off')
         plt.show()
         
-    
-    #save the frequency response in a file
-    Fd_file = h5py.File('flux-out/F_response_1000res-50nm.h5','w')
-    Fd_file.create_dataset('FT_Ex_r',data=ex_arr_real.T)
-    Fd_file.create_dataset('FT_Ex_i',data=ex_arr_imag.T)
-    
-    Fd_file.create_dataset('FT_Ex0_r',data=ex0_arr_real.T)
-    Fd_file.create_dataset('FT_Ex0_i',data=ex0_arr_imag.T)
-    
-    Fd_file.close()
-    
-    
-    data_diff=np.real(ex_arr_complex*np.conj(ex_arr_complex))
-    data_diff2=np.real(ex0_arr_complex*np.conj(ex0_arr_complex))
-    data_diff3=data_diff/data_diff2
-    
-    showMultiple(data_diff3,title='Ex_c*cc')
-    showMultiple(data_diff3,row=3, col=3,title='Ex_c*cc')
-    
-    #showMultiple(data_diff2,title='Ex0_c*cc')
-    #showMultiple(data_diff3,title='Ex_c*cc/Ex0_c*cc')
-    
-    
     def showMaxSlice(array,title,cmap='jet'):
         #shows the slice with the maximum value
         xslice,xpos,ypos=np.unravel_index(array.argmax(), array.shape)
@@ -444,11 +400,25 @@ if(f_response):
         plt.imshow(array[xslice].T, interpolation='spline36', cmap=cmap, vmin=array.min(), vmax=10)
         plt.colorbar()
         plt.show()
+        
+    #save the frequency response in a file
+    Fd_file = h5py.File('flux-out/F_response_1000res-50nm.h5','w')
+    Fd_file.create_dataset('FT_Ex_r',data=ex_arr_complex.real.T)
+    Fd_file.create_dataset('FT_Ex_i',data=ex_arr_complex.imag.T)
     
-    #showMaxSlice(data_diff,title='Ex_c*cc')
+    Fd_file.create_dataset('FT_Ex0_r',data=ex0_arr_complex.real.T)
+    Fd_file.create_dataset('FT_Ex0_i',data=ex0_arr_complex.imag.T)
+    Fd_file.close()
     
-    #showMaxSlice(data_diff2,title='Ex0_c*cc')
-    showMaxSlice(data_diff3,title='Ex_c*cc/Ex0_c*cc')
+    
+    data_diff=np.real(ex_arr_complex*np.conj(ex_arr_complex))
+    data_diff2=np.real(ex0_arr_complex*np.conj(ex0_arr_complex))
+    data_diff3=data_diff/data_diff2
+    
+    showMultiple(data_diff3,title='E/E0')
+    showMultiple(data_diff3,row=3, col=3,title='E/E0')
+    
+    showMaxSlice(data_diff3,title='E/E0')
 
 
 '''
