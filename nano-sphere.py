@@ -331,5 +331,29 @@ plt.grid(True)
 plt.minorticks_on()
 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
 
-    
+'''
+------------------------------
+Section to plot fiting error 
+------------------------------
+'''        
+y=np.array(ext)[np.newaxis].T
+yref=x[0:,1]
+
+deltaSignal = abs(y - yref)
+error = (deltaSignal/yref)*100 # Percent by element. *100
+plt.figure()  
+plt.plot(wl,error, '--r', label='% error')
+#plt.plot(wl,np.ones(len(wl))*meanPctDiff,'r', label='%.2f%% avg error' %meanPctDiff)
+plt.axis([0.3, 0.7, 0, max(error)*1.2])  
+plt.grid(True)
+plt.minorticks_on()
+plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+plt.xlabel("wavelength (um)")
+plt.ylabel('% error', color='r')  
+plt.tick_params('y', colors='r')
+#plt.legend(loc="center right")  
+plt.show()
+print(np.mean(error))
+
+print(error.max()) 
 
