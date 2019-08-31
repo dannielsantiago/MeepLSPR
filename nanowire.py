@@ -20,7 +20,7 @@ cutoff=5
 polarisation=mp.Ex      # Axis of direction of the pulse Ex=TM, Hx=TE
 dpml = 0.7015/2          # Width of th pml layers = wavelength
 
-mx = 8*rad
+mx = 0.2                #8*rad
 fx = 4*rad
 sx = mx+0.01             # Size of inner shell
 sy = sx             # Size of inner shell
