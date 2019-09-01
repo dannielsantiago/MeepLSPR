@@ -33,11 +33,11 @@ nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 time_step=0.05           # time step to measure flux
 add_time=2.0             # additional time until field decays 1e-6
-resolution =250        # resolution pixels/um (pixels/micrometers)
+resolution =100        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
-f_response=True
+f_response=False
 t_response=False
 '''
 
@@ -286,10 +286,13 @@ Plotting the extintion, scattering and absorbtion
 ------------------------------------------------
 '''
 wl = 1/flux_freqs
-incidentPow=incident_flux_b/(4*rad*1000)
+flux_area=fx*1000
+incidentPow=incident_flux_b/flux_area
+#cross-sections
 scat=abs(scat_refl_data_t-scat_refl_data_b+scat_refl_data_r-scat_refl_data_l)/incidentPow
 abso=abs(abso_refl_data_t-abso_refl_data_b+abso_refl_data_r-abso_refl_data_l)/incidentPow
 ext=scat + abso
+#incident pulse
 norm=incidentPow/incidentPow.max()
 
 

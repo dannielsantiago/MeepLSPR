@@ -13,15 +13,16 @@ import matplotlib.pyplot as plt
 #import _shapes as shapes
 from coreShell import c_coreshell
 from materials_library import Ag, Au, cSi, myAg
-
+import math
 import h5py
+import _shapes as shapes
 
 
 
 '''
 ------------------------Parameters of the simulation
 '''
-rad=0.025
+rad=shapes.rad
 w=0.43                  # wavelength
 fcen=1/w                # Pulse center frequency
 df = 1.8                  # pulse width in micrometers
@@ -48,7 +49,7 @@ courant=0.5            # numerical stability, default is 0.5, should be lower in
 
 time_step=0.1           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution = 600        # resolution pixels/um (pixels/micrometers)
+resolution = 100        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 
 cell = mp.Vector3(sx0, sy0, sz0) 
@@ -67,7 +68,7 @@ sph_resonator.do_averaging = True
 geometry = [mp.Block(center=mp.Vector3(),
                      size=mp.Vector3(sx0,sx0,sx0),
                      material=sph_resonator)]
-#geometry = [shapes.sph]
+geometry = [shapes.sph]
 
 #Boundary conditions using Perfectly Maching Layers PML// ficticius absorbtion material to avoid reflection of the fields
 pml_layers = [mp.PML(dpml)]
@@ -153,8 +154,8 @@ Regions for the flux measurement
 
 '''
 # reflected flux / Regions (top,bottom,left,right)
-refl_fr_t = mp.FluxRegion(center=mp.Vector3(0,-fx/2,0), size=mp.Vector3(fx,0,fx))
-refl_fr_b = mp.FluxRegion(center=mp.Vector3(0,fx/2,0), size=mp.Vector3(fx,0,fx))
+refl_fr_t = mp.FluxRegion(center=mp.Vector3(0,fx/2,0), size=mp.Vector3(fx,0,fx)) # usado para normalizar tambien
+refl_fr_b = mp.FluxRegion(center=mp.Vector3(0,-fx/2,0), size=mp.Vector3(fx,0,fx))
 refl_fr_l = mp.FluxRegion(center=mp.Vector3(-fx/2,0,0), size=mp.Vector3(0,fx,fx))
 refl_fr_r = mp.FluxRegion(center=mp.Vector3(fx/2,0,0), size=mp.Vector3(0,fx,fx))
 
@@ -172,8 +173,6 @@ refl_fr_dw = mp.FluxRegion(center=mp.Vector3(0,0,-fx/2), size=mp.Vector3(fx,fx,0
 sim = mp.Simulation(cell_size=cell,
                     boundary_layers=pml_layers,
                     geometry=[],
-                    subpixel_tol=1e-4,
-                    subpixel_maxeval=1000,
                     sources=sources,
                     resolution=resolution,
                     Courant=courant)
@@ -182,10 +181,11 @@ refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t)
 refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
 refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
 refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
-
 refl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
 refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
-    
+  
+flux_freqs = np.array(mp.get_flux_freqs(refl_b))
+  
 sim.use_output_directory('flux-sph600')
 sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
@@ -195,12 +195,16 @@ straight_refl_data_t = sim.get_flux_data(refl_t)
 straight_refl_data_b = sim.get_flux_data(refl_b)
 straight_refl_data_l = sim.get_flux_data(refl_l)
 straight_refl_data_r = sim.get_flux_data(refl_r)
-
 straight_refl_data_up = sim.get_flux_data(refl_up)
 straight_refl_data_dw = sim.get_flux_data(refl_dw)
 
 # save incident flux for transmission plane
-incident_tran_flux = mp.get_fluxes(refl_b)
+incident_flux_b = np.array(mp.get_fluxes(refl_b))
+incident_flux_t = np.array(mp.get_fluxes(refl_t)) 
+incident_flux_l = np.array(mp.get_fluxes(refl_l))
+incident_flur_r = np.array(mp.get_fluxes(refl_r))
+incident_flur_up = np.array(mp.get_fluxes(refl_up))
+incident_flur_dw = np.array(mp.get_fluxes(refl_dw))
 
 '''
 ------------------------------------------------
@@ -212,8 +216,6 @@ sim.reset_meep()
 sim = mp.Simulation(cell_size=cell,
                     boundary_layers=pml_layers,
                     geometry=geometry,
-                    subpixel_tol=1e-4,
-                    subpixel_maxeval=1000,
                     sources=sources,
                     resolution=resolution,
                     Courant=courant)
@@ -223,7 +225,6 @@ refl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t)
 refl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
 refl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
 refl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
-
 refl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
 refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
 
@@ -232,7 +233,6 @@ arefl_t = sim.add_flux(fcen, df, nfreq, refl_fr_t)
 arefl_b = sim.add_flux(fcen, df, nfreq, refl_fr_b)
 arefl_l = sim.add_flux(fcen, df, nfreq, refl_fr_l)
 arefl_r = sim.add_flux(fcen, df, nfreq, refl_fr_r)
-
 arefl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
 arefl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
 
@@ -241,7 +241,6 @@ sim.load_minus_flux_data(refl_t, straight_refl_data_t)
 sim.load_minus_flux_data(refl_b, straight_refl_data_b)
 sim.load_minus_flux_data(refl_l, straight_refl_data_l)
 sim.load_minus_flux_data(refl_r, straight_refl_data_r)
-
 sim.load_minus_flux_data(refl_up, straight_refl_data_up)
 sim.load_minus_flux_data(refl_dw, straight_refl_data_dw)
 
@@ -252,24 +251,21 @@ sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
         #until=until)
 
 #get reflected flux from the surfaces
-scat_refl_data_t = mp.get_fluxes(refl_t)
-scat_refl_data_b = mp.get_fluxes(refl_b)
-scat_refl_data_l = mp.get_fluxes(refl_l)
-scat_refl_data_r = mp.get_fluxes(refl_r)
-
-scat_refl_data_up = mp.get_fluxes(refl_up)
-scat_refl_data_dw = mp.get_fluxes(refl_dw)
+scat_refl_data_t = np.array(mp.get_fluxes(refl_t))
+scat_refl_data_b = np.array(mp.get_fluxes(refl_b))
+scat_refl_data_l = np.array(mp.get_fluxes(refl_l))
+scat_refl_data_r = np.array(mp.get_fluxes(refl_r))
+scat_refl_data_up = np.array(mp.get_fluxes(refl_up))
+scat_refl_data_dw = np.array(mp.get_fluxes(refl_dw))
 
 #get absorbed fluxes from the surfaces
-abs_refl_data_t = mp.get_fluxes(arefl_t)
-abs_refl_data_b = mp.get_fluxes(arefl_b)
-abs_refl_data_l = mp.get_fluxes(arefl_l)
-abs_refl_data_r = mp.get_fluxes(arefl_r)
+abso_refl_data_t = np.array(mp.get_fluxes(arefl_t))
+abso_refl_data_b = np.array(mp.get_fluxes(arefl_b))
+abso_refl_data_l = np.array(mp.get_fluxes(arefl_l))
+abso_refl_data_r = np.array(mp.get_fluxes(arefl_r))
+abso_refl_data_up = np.array(mp.get_fluxes(arefl_up))
+abso_refl_data_dw = np.array(mp.get_fluxes(arefl_dw))
 
-abs_refl_data_up = mp.get_fluxes(arefl_up)
-abs_refl_data_dw = mp.get_fluxes(arefl_dw)
-
-flux_freqs = mp.get_flux_freqs(arefl_b)
 
 
 '''
@@ -277,27 +273,24 @@ flux_freqs = mp.get_flux_freqs(arefl_b)
 Plotting the extintion, scattering and absorbtion
 ------------------------------------------------
 '''
-wl = []
-scat = []
-abso = []
-ext=[]
+wl = 1/flux_freqs
+flux_side=fx*1000
+flux_area=flux_side**2
+sph_area=math.pi*(rad*1000)**2
 
-for i in range(0, nfreq):
-    wl = np.append(wl, 1/flux_freqs[i]) # constructs the x axis wavelength
-
-    scat_refl_flux = abs(scat_refl_data_t[i] - scat_refl_data_b[i]) + abs(scat_refl_data_l[i] - scat_refl_data_r[i]) + abs(scat_refl_data_up[i] - scat_refl_data_dw[i])
-    scat = np.append(scat, scat_refl_flux/incident_tran_flux[i])
-    
-    abs_refl_flux = abs(abs_refl_data_t[i] - abs_refl_data_b[i]) + abs(abs_refl_data_l[i] - abs_refl_data_r[i]) + abs(abs_refl_data_up[i] - abs_refl_data_dw[i])
-    abso = np.append(abso, abs_refl_flux/incident_tran_flux[i])
-    
-
-#multily for area of the sides to get the crossection in nm,
-# area=4*rad=100 nm
-scat=scat*rad*rad*10000
-abso=abso*rad*rad*10000
+incidentPow=incident_flux_b/flux_area
+#cross_sections
+scat=(abs(scat_refl_data_t - scat_refl_data_b) + abs(scat_refl_data_l - scat_refl_data_r) + abs(scat_refl_data_up - scat_refl_data_dw))/incidentPow
+abso=(abs(abso_refl_data_t - abso_refl_data_b) + abs(abso_refl_data_l - abso_refl_data_r) + abs(abso_refl_data_up - abso_refl_data_dw))/incidentPow
 ext=scat + abso
+#efficiencies
+scat/=sph_area
+abso/=sph_area
+ext/=sph_area
 
+
+norm=incidentPow/incidentPow.max()
+    
 #saving simulation data in external file
 Fd_file = h5py.File('flux-sph/cross-sections-25nm600.h5','w')
 Fd_file.create_dataset('wl',data=wl)
@@ -315,7 +308,7 @@ plt.plot(wl,abso,'sr',label='absorption')
 plt.plot(wl,ext,'^g', label='extinction')
 
 #Analytical model
-x=c_coreshell(wl*1000,'Ag','Ag',1,15,10,5)
+x=c_coreshell(wl*1000,'Au','Au',1,20,5,5)
 
 plt.plot(x[0:,0],x[0:,1], '-k',label='Analytical model')
 plt.plot(x[0:,0],x[0:,2], '-k')
@@ -326,7 +319,7 @@ plt.title('Efficiencies of Silver sphere of radius %inm' %radx)
 plt.xlabel("wavelength (um)")
 plt.ylabel("Efficiencies")
 plt.legend(loc="upper right")  
-plt.axis([0.24, 0.7, 0, max(ext)*1.2])
+plt.axis([0.31, 0.7, 0, max(ext)*1.2])
 plt.grid(True)
 plt.minorticks_on()
 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
