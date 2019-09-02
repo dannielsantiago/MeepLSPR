@@ -33,7 +33,7 @@ nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
 time_step=0.05           # time step to measure flux
 add_time=2.0             # additional time until field decays 1e-6
-resolution =100        # resolution pixels/um (pixels/micrometers)
+resolution =250        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
@@ -181,14 +181,13 @@ incident_flur_r = np.array(mp.get_fluxes(refl_r))
 if(f_response):
     #get real and imaginary parts of all frequency responses for each frequency 
     ex0_arr_real = []
+    ex0_arr_imag = []
     for i in range(nfreq):
-        ex0_arr_real=np.append(ex0_arr_real,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))   
+        ex0_arr_real=np.append(ex0_arr_real,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0))) 
+        ex0_arr_imag=np.append(ex0_arr_imag,np.imag(sim.get_dft_array(dft_objx[i], polarisation, 0)))
+    
     size=int(np.sqrt(len(ex0_arr_real)/nfreq))
     ex0_arr_real=ex0_arr_real.reshape((nfreq,size,size))
-    
-    ex0_arr_imag = []
-    for i in range(len(flux_freqs)):
-        ex0_arr_imag=np.append(ex0_arr_imag,np.imag(sim.get_dft_array(dft_objx[i], polarisation, 0)))
     ex0_arr_imag=ex0_arr_imag.reshape((nfreq,size,size))
     
     ex0_arr_complex=np.zeros_like(ex0_arr_real, dtype=complex)
@@ -234,7 +233,7 @@ sim.load_minus_flux_data(refl_r, straight_refl_data_r)
 if(f_response):
     #setup of the object in which the freq response will be stored via sim.add_dft_fields for all frequencies used in simulation
     dft_objx=[]
-    for i in range(len(flux_freqs)):
+    for i in range(nfreq):
         dft_objx=np.append(dft_objx,sim.add_dft_fields([polarisation], flux_freqs[i], flux_freqs[i], 1, where=monitor))
     
 sim.use_output_directory('flux-out')
@@ -265,14 +264,12 @@ transmitted_flux = abso_refl_data_b
 eps_data = sim.get_array(vol=monitor, component=mp.Dielectric)
 
 if(f_response):
-    ex_arr_real = []
-    for i in range(len(flux_freqs)):
-        ex_arr_real=np.append(ex_arr_real,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))
-    ex_arr_real=ex_arr_real.reshape((nfreq,size,size))
-    
     ex_arr_imag = []
-    for i in range(len(flux_freqs)):
+    ex_arr_real = []
+    for i in range(nfreq):
+        ex_arr_real=np.append(ex_arr_real,np.real(sim.get_dft_array(dft_objx[i], polarisation, 0)))
         ex_arr_imag=np.append(ex_arr_imag,np.imag(sim.get_dft_array(dft_objx[i], polarisation, 0)))
+    ex_arr_real=ex_arr_real.reshape((nfreq,size,size))
     ex_arr_imag=ex_arr_imag.reshape((nfreq,size,size))
     
     ex_arr_complex=np.zeros_like(ex_arr_real, dtype=complex)

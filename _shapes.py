@@ -27,7 +27,7 @@ cyl2 = mp.Cylinder(center=mp.Vector3(0,0,0), height=mp.inf, radius=rad,
 water = mp.Cylinder(center=mp.Vector3(0,0,0), height=mp.inf, radius=rad+0.005,
                   axis=mp.Vector3(0,0,1), material=mp.Medium(epsilon=1.69))
 
-sph = mp.Sphere(radius=rad, center=mp.Vector3(0,0,0), material=Ag)
+sph = mp.Sphere(radius=rad, center=mp.Vector3(0,0,0), material=material)
 
 # An ellipsoid with its long axis pointing along (1,1,1), centered on
 # the origin (the other two axes are orthogonal and have equal semi-axis lengths):

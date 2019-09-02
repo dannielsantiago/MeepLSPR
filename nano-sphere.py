@@ -49,25 +49,16 @@ courant=0.5            # numerical stability, default is 0.5, should be lower in
 
 time_step=0.1           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution = 100        # resolution pixels/um (pixels/micrometers)
+resolution = 600        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 
 cell = mp.Vector3(sx0, sy0, sz0) 
-monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
+monitorxy = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
+monitorxz = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,0,mx))
+f_response=True
 
 
 #Inside the geometry object, the device structure is specified together with its center and the type of the material used
-def sph_resonator(p):
-    rr = (p.x**2+p.y**2)**0.5
-    if (rr < rad):
-        return Ag
-    return mp.air
-
-sph_resonator.do_averaging = True
-
-geometry = [mp.Block(center=mp.Vector3(),
-                     size=mp.Vector3(sx0,sx0,sx0),
-                     material=sph_resonator)]
 geometry = [shapes.sph]
 
 #Boundary conditions using Perfectly Maching Layers PML// ficticius absorbtion material to avoid reflection of the fields
@@ -185,10 +176,18 @@ refl_up = sim.add_flux(fcen, df, nfreq, refl_fr_up)
 refl_dw = sim.add_flux(fcen, df, nfreq, refl_fr_dw)
   
 flux_freqs = np.array(mp.get_flux_freqs(refl_b))
-  
-sim.use_output_directory('flux-sph600')
-sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
-        until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
+
+if(f_response):
+    #setup of the object in which the freq response will be stored via sim.add_dft_fields for all frequencies used in simulation
+    dft_objxy=[]
+    dft_objxz=[]
+    for i in range(nfreq):
+        dft_objxy=np.append(dft_objxy,sim.add_dft_fields([polarisation], flux_freqs[i], flux_freqs[i], 1, where=monitorxy))
+        dft_objxz=np.append(dft_objxz,sim.add_dft_fields([polarisation], flux_freqs[i], flux_freqs[i], 1, where=monitorxz))
+    
+    
+sim.use_output_directory('flux-sph')
+sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
 
 # for normalization run, save flux fields data for reflection plane
 straight_refl_data_t = sim.get_flux_data(refl_t)
@@ -206,6 +205,38 @@ incident_flur_r = np.array(mp.get_fluxes(refl_r))
 incident_flur_up = np.array(mp.get_fluxes(refl_up))
 incident_flur_dw = np.array(mp.get_fluxes(refl_dw))
 
+if(f_response):
+    #get real and imaginary parts of all frequency responses for each frequency 
+    ex0_xy_r = []
+    ex0_xy_i = []
+    ex0_xz_r = []
+    ex0_xz_i = []
+    
+    for i in range(nfreq):
+        ex0_xy_r=np.append(ex0_xy_r,np.real(sim.get_dft_array(dft_objxy[i], polarisation, 0))) 
+        ex0_xy_i=np.append(ex0_xy_i,np.imag(sim.get_dft_array(dft_objxy[i], polarisation, 0)))
+        ex0_xz_r=np.append(ex0_xz_r,np.real(sim.get_dft_array(dft_objxz[i], polarisation, 0))) 
+        ex0_xz_i=np.append(ex0_xz_i,np.imag(sim.get_dft_array(dft_objxz[i], polarisation, 0)))
+
+    size=int(np.sqrt(len(ex0_xy_r)/nfreq))
+    ex0_xy_r=ex0_xy_r.reshape((nfreq,size,size))
+    ex0_xy_i=ex0_xy_i.reshape((nfreq,size,size))
+    ex0_xz_r=ex0_xz_r.reshape((nfreq,size,size))
+    ex0_xz_i=ex0_xz_i.reshape((nfreq,size,size))
+    
+ 
+    ex0_xy_complex=np.zeros_like(ex0_xy_r, dtype=complex)
+    ex0_xz_complex=np.zeros_like(ex0_xz_r, dtype=complex)
+
+    ex0_xy_complex.real=ex0_xy_r
+    ex0_xy_complex.imag=ex0_xy_i
+    del ex0_xy_r
+    del ex0_xy_i
+    ex0_xz_complex.real=ex0_xz_r
+    ex0_xz_complex.imag=ex0_xz_i
+    del ex0_xz_r
+    del ex0_xz_i
+    
 '''
 ------------------------------------------------
 2nd Simulation with particle and get Scattered Flux
@@ -244,10 +275,16 @@ sim.load_minus_flux_data(refl_r, straight_refl_data_r)
 sim.load_minus_flux_data(refl_up, straight_refl_data_up)
 sim.load_minus_flux_data(refl_dw, straight_refl_data_dw)
 
-
-sim.use_output_directory('flux-sph600')
-sim.run(mp.in_volume(monitor, mp.at_beginning(mp.output_epsilon)),
-        until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
+if(f_response):
+    #setup of the object in which the freq response will be stored via sim.add_dft_fields for all frequencies used in simulation
+    dft_objxy=[]
+    dft_objxz=[]
+    for i in range(nfreq):
+        dft_objxy=np.append(dft_objxy,sim.add_dft_fields([polarisation], flux_freqs[i], flux_freqs[i], 1, where=monitorxy))
+        dft_objxz=np.append(dft_objxz,sim.add_dft_fields([polarisation], flux_freqs[i], flux_freqs[i], 1, where=monitorxz))
+        
+sim.use_output_directory('flux-sph')
+sim.run(until_after_sources=mp.stop_when_fields_decayed(add_time,polarisation,pt,decay))
         #until=until)
 
 #get reflected flux from the surfaces
@@ -266,7 +303,35 @@ abso_refl_data_r = np.array(mp.get_fluxes(arefl_r))
 abso_refl_data_up = np.array(mp.get_fluxes(arefl_up))
 abso_refl_data_dw = np.array(mp.get_fluxes(arefl_dw))
 
+if(f_response):
+    #get real and imaginary parts of all frequency responses for each frequency 
+    ex_xy_r = []
+    ex_xy_i = []
+    ex_xz_r = []
+    ex_xz_i = []
+    
+    for i in range(nfreq):
+        ex_xy_r=np.append(ex_xy_r,np.real(sim.get_dft_array(dft_objxy[i], polarisation, 0))) 
+        ex_xy_i=np.append(ex_xy_i,np.imag(sim.get_dft_array(dft_objxy[i], polarisation, 0)))
+        ex_xz_r=np.append(ex_xz_r,np.real(sim.get_dft_array(dft_objxz[i], polarisation, 0))) 
+        ex_xz_i=np.append(ex_xz_i,np.imag(sim.get_dft_array(dft_objxz[i], polarisation, 0)))
 
+    ex_xy_r=ex_xy_r.reshape((nfreq,size,size))
+    ex_xy_i=ex_xy_i.reshape((nfreq,size,size))
+    ex_xz_r=ex_xz_r.reshape((nfreq,size,size))
+    ex_xz_i=ex_xz_i.reshape((nfreq,size,size))
+    
+    ex_xy_complex=np.zeros_like(ex_xy_r, dtype=complex)
+    ex_xz_complex=np.zeros_like(ex_xz_r, dtype=complex)
+
+    ex_xy_complex.real=ex_xy_r
+    ex_xy_complex.imag=ex_xy_i
+    del ex_xy_r
+    del ex_xy_i
+    ex_xz_complex.real=ex_xz_r
+    ex_xz_complex.imag=ex_xz_i
+    del ex_xz_r
+    del ex_xz_i
 
 '''
 ------------------------------------------------
@@ -292,7 +357,7 @@ ext/=sph_area
 norm=incidentPow/incidentPow.max()
     
 #saving simulation data in external file
-Fd_file = h5py.File('flux-sph/cross-sections-25nm600.h5','w')
+Fd_file = h5py.File('flux-sph-600/cross-sections-25nm.h5','w')
 Fd_file.create_dataset('wl',data=wl)
 Fd_file.create_dataset('ext',data=ext)
 Fd_file.create_dataset('scat',data=scat)
@@ -301,6 +366,14 @@ Fd_file.create_dataset('rad',data=rad)
 Fd_file.create_dataset('resolution',data=resolution)
 Fd_file.close()
 
+Fd_file = h5py.File('flux-sph-600/scat-fx-25nm.h5','w')
+Fd_file.create_dataset('scat_up',data=scat_refl_data_up)
+Fd_file.create_dataset('scat_dw',data=scat_refl_data_dw)
+Fd_file.create_dataset('scat_b',data=scat_refl_data_b)
+Fd_file.create_dataset('scat_t',data=scat_refl_data_t)
+Fd_file.create_dataset('scat_l',data=scat_refl_data_l)
+Fd_file.create_dataset('scat_r',data=scat_refl_data_r)
+Fd_file.close()
 
 plt.figure()
 plt.plot(wl,scat,'ob',label='scatering')
@@ -308,7 +381,7 @@ plt.plot(wl,abso,'sr',label='absorption')
 plt.plot(wl,ext,'^g', label='extinction')
 
 #Analytical model
-x=c_coreshell(wl*1000,'Au','Au',1,20,5,5)
+x=c_coreshell(wl*1000,'Ag','Ag',1,20,5,5)
 
 plt.plot(x[0:,0],x[0:,1], '-k',label='Analytical model')
 plt.plot(x[0:,0],x[0:,2], '-k')
@@ -349,4 +422,66 @@ plt.show()
 print(np.mean(error))
 
 print(error.max()) 
+
+if(f_response):
+    wl_r=wl[::-1]
+    #FT with particle
+    #function to plot an array vs the eps_data(wire) 
+    def showMultiple(array,title,row=5,col=5,cmap='jet',log=False,domain='frequency'):
+        row_=row
+        col_=col
+        N=row_*col_
+        x=np.linspace(0,99,N)
+        print(x)
+        plt.figure()
+        plt.suptitle(title)
+        for i in range(N):
+            plt.subplot(row,col,i+1)
+            #plt.imshow(eps_data.T, interpolation='spline36', cmap='binary')
+            plt.imshow(array[int(x[i])].T, interpolation='spline36', cmap=cmap, alpha=0.9, vmin=array.min(), vmax=10)
+            if domain=='frequency':    
+                plt.ylabel(str(int(wl_r[int(x[i])]*1000))+' nm')
+            elif domain=='time':
+                plt.ylabel('t= '+str(int(i*len(array)/N)))
+            #plt.colorbar()
+            #plt.axis('off')
+        plt.show()
+        
+    def showMaxSlice(array,title,cmap='jet'):
+        #shows the slice with the maximum value
+        xslice,xpos,ypos=np.unravel_index(array.argmax(), array.shape)
+        print(xslice)
+        plt.figure()
+        plt.suptitle(title)
+        plt.imshow(array[xslice].T, interpolation='spline36', cmap=cmap, vmin=array.min(), vmax=10)
+        plt.colorbar()
+        plt.show()
+        
+    #save the frequency response in a file
+    Fd_file = h5py.File('flux-sph-600/F_response-xy-25nm.h5','w')
+    Fd_file.create_dataset('FT_Ex_r',data=ex_xy_complex.real.T)
+    Fd_file.create_dataset('FT_Ex_i',data=ex_xy_complex.imag.T)
+    Fd_file.create_dataset('FT_Ex0_r',data=ex0_xy_complex.real.T)
+    Fd_file.create_dataset('FT_Ex0_i',data=ex0_xy_complex.imag.T)
+    Fd_file.close()
+    Fd_file = h5py.File('flux-sph-600/F_response-xz-25nm.h5','w')
+    Fd_file.create_dataset('FT_Ex_r',data=ex_xz_complex.real.T)
+    Fd_file.create_dataset('FT_Ex_i',data=ex_xz_complex.imag.T)
+    Fd_file.create_dataset('FT_Ex0_r',data=ex0_xz_complex.real.T)
+    Fd_file.create_dataset('FT_Ex0_i',data=ex0_xz_complex.imag.T)
+    Fd_file.close()
+    
+    data_diff=np.real(ex_xy_complex*np.conj(ex_xy_complex))
+    data_diff2=np.real(ex0_xy_complex*np.conj(ex0_xy_complex))
+    data_diff3=data_diff/data_diff2
+    showMultiple(data_diff3,title='E/E0 - xy')
+    #showMultiple(data_diff3,row=3, col=3,title='E/E0 - xy')
+    #showMaxSlice(data_diff3,title='E/E0 - xy')
+
+    data_diff=np.real(ex_xz_complex*np.conj(ex_xz_complex))
+    data_diff2=np.real(ex0_xz_complex*np.conj(ex0_xz_complex))
+    data_diff3=data_diff/data_diff2
+    showMultiple(data_diff3,title='E/E0 - xz')
+    #showMultiple(data_diff3,row=3, col=3,title='E/E0 - xy')
+    #showMaxSlice(data_diff3,title='E/E0 - xy')
 
