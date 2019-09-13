@@ -22,6 +22,8 @@ import _shapes as shapes
 '''
 ------------------------Parameters of the simulation
 '''
+f_response=False
+
 rad=shapes.rad
 w=0.43                  # wavelength
 fcen=1/w                # Pulse center frequency
@@ -30,18 +32,20 @@ df = 1.8                  # pulse width in micrometers
 polarisation=mp.Ex              # Axis of direction of the pulse Ex=TM, Hx=TE
 dpml = 0.7015/2                # Width of th pml layers = wavelength
 
-mx = 0.2             # size of monitor box side 8*rad
-fx = 4*rad              # size of flux box side
+mx = 2.0*rad             # size of monitor box side 8*rad
+if (f_response):
+    mx=0.2
+fx = 2.0*rad              # size of flux box side
 
-sx = mx+0.01             # Size of inner shell
-sy = mx+0.01             # Size of inner shell
-sz = mx+0.01             # Size of inner shell
+sx = mx+0.002             # Size of inner shell
+sy = mx+0.002             # Size of inner shell
+sz = mx+0.002             # Size of inner shell
 
 sx0 = sx + 2*dpml       # size of cell in X direction
 sy0 = sy + 2*dpml       # size of cell in Y direction
 sz0 = sz + 2*dpml       # size of cell in z direction
 
-sc=mx/2 + 0.005           # source center coordinate shift
+sc=mx/2 + 0.001           # source center coordinate shift
 sw=sx0                  # source width, needs to be bigger than inner cell to generate only plane-waves
 
 nfreq = 100             # number of frequencies at which to compute flux
@@ -49,15 +53,15 @@ courant=0.5            # numerical stability, default is 0.5, should be lower in
 
 time_step=0.1           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution = 600        # resolution pixels/um (pixels/micrometers)
+resolution =700        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 
 cell = mp.Vector3(sx0, sy0, sz0) 
 monitorxy = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
 monitorxz = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,0,mx))
-f_response=True
 
-
+subpixel_tol=1e-3
+subpixel_maxeval=1000
 #Inside the geometry object, the device structure is specified together with its center and the type of the material used
 geometry = [shapes.sph]
 
@@ -164,6 +168,8 @@ refl_fr_dw = mp.FluxRegion(center=mp.Vector3(0,0,-fx/2), size=mp.Vector3(fx,fx,0
 sim = mp.Simulation(cell_size=cell,
                     boundary_layers=pml_layers,
                     geometry=[],
+                    subpixel_tol=subpixel_tol,
+                    subpixel_maxeval=subpixel_maxeval,
                     sources=sources,
                     resolution=resolution,
                     Courant=courant)
@@ -248,6 +254,8 @@ sim = mp.Simulation(cell_size=cell,
                     boundary_layers=pml_layers,
                     geometry=geometry,
                     sources=sources,
+                    subpixel_tol=subpixel_tol,
+                    subpixel_maxeval=subpixel_maxeval,
                     resolution=resolution,
                     Courant=courant)
 
@@ -343,10 +351,11 @@ flux_side=fx*1000
 flux_area=flux_side**2
 sph_area=math.pi*(rad*1000)**2
 
-incidentPow=incident_flux_b/flux_area
+incidentPow=incident_flux_t/flux_area
 #cross_sections
-scat=(abs(scat_refl_data_t - scat_refl_data_b) + abs(scat_refl_data_l - scat_refl_data_r) + abs(scat_refl_data_up - scat_refl_data_dw))/incidentPow
-abso=(abs(abso_refl_data_t - abso_refl_data_b) + abs(abso_refl_data_l - abso_refl_data_r) + abs(abso_refl_data_up - abso_refl_data_dw))/incidentPow
+abso=abs(abso_refl_data_b - abso_refl_data_t + abso_refl_data_l - abso_refl_data_r + abso_refl_data_dw - abso_refl_data_up)/incidentPow
+scat=abs(scat_refl_data_b - scat_refl_data_t + scat_refl_data_l - scat_refl_data_r + scat_refl_data_dw - scat_refl_data_up)/incidentPow
+
 ext=scat + abso
 #efficiencies
 scat/=sph_area
@@ -357,7 +366,7 @@ ext/=sph_area
 norm=incidentPow/incidentPow.max()
     
 #saving simulation data in external file
-Fd_file = h5py.File('flux-sph-600/cross-sections-25nm.h5','w')
+Fd_file = h5py.File('flux-sph/cross-sections-25nm.h5','w')
 Fd_file.create_dataset('wl',data=wl)
 Fd_file.create_dataset('ext',data=ext)
 Fd_file.create_dataset('scat',data=scat)
@@ -365,14 +374,29 @@ Fd_file.create_dataset('abso',data=abso)
 Fd_file.create_dataset('rad',data=rad)
 Fd_file.create_dataset('resolution',data=resolution)
 Fd_file.close()
-
-Fd_file = h5py.File('flux-sph-600/scat-fx-25nm.h5','w')
+Fd_file = h5py.File('flux-sph/scat-fx-25nm.h5','w')
 Fd_file.create_dataset('scat_up',data=scat_refl_data_up)
 Fd_file.create_dataset('scat_dw',data=scat_refl_data_dw)
 Fd_file.create_dataset('scat_b',data=scat_refl_data_b)
 Fd_file.create_dataset('scat_t',data=scat_refl_data_t)
 Fd_file.create_dataset('scat_l',data=scat_refl_data_l)
 Fd_file.create_dataset('scat_r',data=scat_refl_data_r)
+Fd_file.close()
+Fd_file = h5py.File('flux-sph/incident-fx-25nm.h5','w')
+Fd_file.create_dataset('in_up',data=incident_flur_up)
+Fd_file.create_dataset('in_dw',data=incident_flur_dw)
+Fd_file.create_dataset('in_b',data=incident_flux_b)
+Fd_file.create_dataset('in_t',data=incident_flux_t)
+Fd_file.create_dataset('in_l',data=incident_flux_l)
+Fd_file.create_dataset('in_r',data=incident_flur_r)
+Fd_file.close()
+Fd_file = h5py.File('flux-sph/abso-fx-25nm.h5','w')
+Fd_file.create_dataset('abso_up',data=abso_refl_data_up)
+Fd_file.create_dataset('abso_dw',data=abso_refl_data_dw)
+Fd_file.create_dataset('abso_b',data=abso_refl_data_b)
+Fd_file.create_dataset('abso_t',data=abso_refl_data_t)
+Fd_file.create_dataset('abso_l',data=abso_refl_data_l)
+Fd_file.create_dataset('abso_r',data=abso_refl_data_r)
 Fd_file.close()
 
 plt.figure()
@@ -381,7 +405,7 @@ plt.plot(wl,abso,'sr',label='absorption')
 plt.plot(wl,ext,'^g', label='extinction')
 
 #Analytical model
-x=c_coreshell(wl*1000,'Ag','Ag',1,20,5,5)
+x=c_coreshell(wl*1000,'Ag','Ag',1,rad*1000,0,5)
 
 plt.plot(x[0:,0],x[0:,1], '-k',label='Analytical model')
 plt.plot(x[0:,0],x[0:,2], '-k')
@@ -458,13 +482,13 @@ if(f_response):
         plt.show()
         
     #save the frequency response in a file
-    Fd_file = h5py.File('flux-sph-600/F_response-xy-25nm.h5','w')
+    Fd_file = h5py.File('flux-sph/F_response-xy-25nm.h5','w')
     Fd_file.create_dataset('FT_Ex_r',data=ex_xy_complex.real.T)
     Fd_file.create_dataset('FT_Ex_i',data=ex_xy_complex.imag.T)
     Fd_file.create_dataset('FT_Ex0_r',data=ex0_xy_complex.real.T)
     Fd_file.create_dataset('FT_Ex0_i',data=ex0_xy_complex.imag.T)
     Fd_file.close()
-    Fd_file = h5py.File('flux-sph-600/F_response-xz-25nm.h5','w')
+    Fd_file = h5py.File('flux-sph/F_response-xz-25nm.h5','w')
     Fd_file.create_dataset('FT_Ex_r',data=ex_xz_complex.real.T)
     Fd_file.create_dataset('FT_Ex_i',data=ex_xz_complex.imag.T)
     Fd_file.create_dataset('FT_Ex0_r',data=ex0_xz_complex.real.T)
