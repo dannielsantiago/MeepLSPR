@@ -283,14 +283,14 @@ Ag_susc = [ mp.DrudeSusceptibility(frequency=Ag_frq0, gamma=Ag_gam0, sigma=Ag_si
             mp.LorentzianSusceptibility(frequency=Ag_frq4, gamma=Ag_gam4, sigma=Ag_sig4),
             mp.LorentzianSusceptibility(frequency=Ag_frq5, gamma=Ag_gam5, sigma=Ag_sig5)]
 
-Ag_susc2 = [ mp.DrudeSusceptibility(frequency=1e-10, gamma=0.038715, sigma=4.4625e+21),
+Ag_susc2 = [ mp.DrudeSusceptibility(frequency=1e-20, gamma=0.038715, sigma=4.4625e+41),
             mp.LorentzianSusceptibility(frequency=0.65815, gamma=3.1343, sigma=7.9247),
             mp.LorentzianSusceptibility(frequency= 3.6142, gamma=0.36456, sigma=0.50133),
             mp.LorentzianSusceptibility(frequency=6.6017, gamma=0.052426, sigma=0.013329),
             mp.LorentzianSusceptibility(frequency=7.3259, gamma=0.7388, sigma=0.82655),
             mp.LorentzianSusceptibility(frequency=16.365, gamma=1.9511, sigma=1.1133)]
 
-Ag = mp.Medium(epsilon=1.0001, E_susceptibilities=Ag_susc, valid_freq_range=metal_range)
+Ag = mp.Medium(epsilon=1.0, E_susceptibilities=Ag_susc2, valid_freq_range=metal_range)
 
 myAg = mp.Medium(epsilon=1, E_susceptibilities=Ag_susc2, valid_freq_range=metal_range)
 #------------------------------------------------------------------
