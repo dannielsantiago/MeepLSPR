@@ -8,15 +8,16 @@ Different shapes to be used by the plasmonic structure
 
 #Import libraries
 import meep as mp
-from materials_library import Ag, Au, cSi, myAg
+from materials_library import Ag, Au, cSi, myAg, um_scale
 #import _materials as lib
 import math
 
 
 # A cylinder of infinite radius and height 0.25 pointing along the x axis,
 # centered at the origin:
-rad=0.025 #micrometers units
-material=Ag
+rad=0.045/um_scale #micrometers units
+material=Au
+mat = 'Au'
 
 cyl = mp.Cylinder(center=mp.Vector3(0,0,0), height=mp.inf, radius=rad,
                   axis=mp.Vector3(0,0,1), material=material)
