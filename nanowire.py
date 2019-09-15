@@ -8,32 +8,35 @@ from scipy.signal import find_peaks
 import h5py
 
 import c_wire90 as theoretical
+from materials_library import um_scale
 
 '''
 ------------------------Parameters of the simulation
 '''
+a = um_scale
+
 rad=shapes.rad
-w=0.43                  # wavelength
+w=0.43/a                  # wavelength
 fcen=1/w                # Pulse center frequency
-df = 1.8                # 3,5pulse frequency width 
+df = 1.8*a                # 3,5pulse frequency width 
 cutoff=5
 polarisation=mp.Ex      # Axis of direction of the pulse Ex=TM, Hx=TE
-dpml = 0.7015/2          # Width of th pml layers = wavelength
+dpml = 0.7015/(2*a)          # Width of th pml layers = wavelength
 
-mx = 0.2                #8*rad
-fx = 4*rad
-sx = mx+0.01             # Size of inner shell
+mx = 3*rad                #8*rad
+fx = 2.5*rad
+sx = mx+0.01/a             # Size of inner shell
 sy = sx             # Size of inner shell
 sx0 = sx + 2*dpml       # size of cell in X direction
 sy0 = sy + 2*dpml       # size of cell in Y direction
-sc=mx/2 + 0.005                # source center coordinate shift
+sc=mx/2 + 0.005/a                # source center coordinate shift
 sw=sx0                  # source width, needs to be bigger than inner cell to generate only plane-waves
 
 nfreq = 100             # number of frequencies at which to compute flux
 courant=0.5            # numerical stability, default is 0.5, should be lower in case refractive index n<1
-time_step=0.05           # time step to measure flux
-add_time=2.0             # additional time until field decays 1e-6
-resolution =250        # resolution pixels/um (pixels/micrometers)
+time_step=0.05/a           # time step to measure flux
+add_time=2.0/a             # additional time until field decays 1e-6
+resolution =250*a       # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 cell = mp.Vector3(sx0, sy0, 0) 
 monitor = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
@@ -282,8 +285,8 @@ if(f_response):
 Plotting the extintion, scattering and absorbtion
 ------------------------------------------------
 '''
-wl = 1/flux_freqs
-flux_area=fx*1000
+wl = a/flux_freqs
+flux_area=fx*1000*a
 incidentPow=incident_flux_b/flux_area
 #cross-sections
 scat=abs(scat_refl_data_t-scat_refl_data_b+scat_refl_data_r-scat_refl_data_l)/incidentPow
@@ -309,7 +312,7 @@ Fd_file.close()
 check c_wire90.py for instructions
 ---------------------------------
 '''
-mat=theoretical.C_wire90(wl*1000,'Ag',1.0,shapes.rad*1000,16,'TM')
+mat=theoretical.C_wire90(wl*1000,shapes.mat,1.0,shapes.rad*1000*a,16,'TM')
 '''
 ------------------------------------------------------
 Section to plot Meep simulation and Analytical response 
@@ -331,7 +334,7 @@ plt.title('Cross-sections of Silver Nanowire of radius %inm and TM polarisation'
 plt.xlabel("wavelength (um)")
 plt.ylabel("cross-section (nm)")
 plt.legend(loc="upper right")  
-plt.axis([0.31, 0.7, 0, max(mat[0:,1])*1.2])
+#plt.axis([0.31, 0.7, 0, max(mat[0:,1])*1.2])
 plt.grid(True)
 plt.minorticks_on()
 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
