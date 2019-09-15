@@ -32,10 +32,10 @@ df = 1.8                  # pulse width in micrometers
 polarisation=mp.Ex              # Axis of direction of the pulse Ex=TM, Hx=TE
 dpml = 0.7015/2                # Width of th pml layers = wavelength
 
-mx = 2.0*rad             # size of monitor box side 8*rad
+mx = 2.2*rad             # size of monitor box side 8*rad
 if (f_response):
     mx=0.2
-fx = 2.0*rad              # size of flux box side
+fx = 2.2*rad              # size of flux box side
 
 sx = mx+0.002             # Size of inner shell
 sy = mx+0.002             # Size of inner shell
@@ -53,15 +53,13 @@ courant=0.5            # numerical stability, default is 0.5, should be lower in
 
 time_step=0.1           # time step to measure flux
 add_time=2             # additional time until field decays 1e-6
-resolution =700        # resolution pixels/um (pixels/micrometers)
+resolution =100        # resolution pixels/um (pixels/micrometers)
 decay = 1e-12           # decay limit condition for the field measurement
 
 cell = mp.Vector3(sx0, sy0, sz0) 
 monitorxy = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,mx,0))
 monitorxz = mp.Volume(center=mp.Vector3(0,0,0), size=mp.Vector3(mx,0,mx))
 
-subpixel_tol=1e-3
-subpixel_maxeval=1000
 #Inside the geometry object, the device structure is specified together with its center and the type of the material used
 geometry = [shapes.sph]
 
@@ -149,13 +147,13 @@ Regions for the flux measurement
 
 '''
 # reflected flux / Regions (top,bottom,left,right)
-refl_fr_t = mp.FluxRegion(center=mp.Vector3(0,fx/2,0), size=mp.Vector3(fx,0,fx)) # usado para normalizar tambien
-refl_fr_b = mp.FluxRegion(center=mp.Vector3(0,-fx/2,0), size=mp.Vector3(fx,0,fx))
-refl_fr_l = mp.FluxRegion(center=mp.Vector3(-fx/2,0,0), size=mp.Vector3(0,fx,fx))
-refl_fr_r = mp.FluxRegion(center=mp.Vector3(fx/2,0,0), size=mp.Vector3(0,fx,fx))
+refl_fr_t = mp.FluxRegion(center=mp.Vector3(0,fx/2.0,0), size=mp.Vector3(fx,0,fx)) # usado para normalizar tambien
+refl_fr_b = mp.FluxRegion(center=mp.Vector3(0,-fx/2.0,0), size=mp.Vector3(fx,0,fx))
+refl_fr_l = mp.FluxRegion(center=mp.Vector3(-fx/2.0,0,0), size=mp.Vector3(0,fx,fx))
+refl_fr_r = mp.FluxRegion(center=mp.Vector3(fx/2.0,0,0), size=mp.Vector3(0,fx,fx))
 
-refl_fr_up = mp.FluxRegion(center=mp.Vector3(0,0,fx/2), size=mp.Vector3(fx,fx,0))
-refl_fr_dw = mp.FluxRegion(center=mp.Vector3(0,0,-fx/2), size=mp.Vector3(fx,fx,0))
+refl_fr_up = mp.FluxRegion(center=mp.Vector3(0,0,fx/2.0), size=mp.Vector3(fx,fx,0))
+refl_fr_dw = mp.FluxRegion(center=mp.Vector3(0,0,-fx/2.0), size=mp.Vector3(fx,fx,0))
 
 
 
@@ -168,8 +166,6 @@ refl_fr_dw = mp.FluxRegion(center=mp.Vector3(0,0,-fx/2), size=mp.Vector3(fx,fx,0
 sim = mp.Simulation(cell_size=cell,
                     boundary_layers=pml_layers,
                     geometry=[],
-                    subpixel_tol=subpixel_tol,
-                    subpixel_maxeval=subpixel_maxeval,
                     sources=sources,
                     resolution=resolution,
                     Courant=courant)
@@ -254,8 +250,6 @@ sim = mp.Simulation(cell_size=cell,
                     boundary_layers=pml_layers,
                     geometry=geometry,
                     sources=sources,
-                    subpixel_tol=subpixel_tol,
-                    subpixel_maxeval=subpixel_maxeval,
                     resolution=resolution,
                     Courant=courant)
 
@@ -349,10 +343,18 @@ Plotting the extintion, scattering and absorbtion
 wl = 1/flux_freqs
 flux_side=fx*1000
 flux_area=flux_side**2
-sph_area=math.pi*(rad*1000)**2
+sph_area=math.pi*((rad*1000)**2)
 
 incidentPow=incident_flux_t/flux_area
+incidentPowb=incident_flux_b/flux_area
+
 #cross_sections
+abso=abs(abso_refl_data_b/incidentPowb - (abso_refl_data_t + abso_refl_data_l - abso_refl_data_r + abso_refl_data_dw - abso_refl_data_up)/incidentPow)
+scat=abs(scat_refl_data_b/incidentPowb - (scat_refl_data_t + scat_refl_data_l - scat_refl_data_r + scat_refl_data_dw - scat_refl_data_up)/incidentPow)
+
+abso=abs(abso_refl_data_b/incidentPowb + (-abso_refl_data_t + abso_refl_data_l - abso_refl_data_r + abso_refl_data_dw - abso_refl_data_up)/incidentPow)
+scat=abs(scat_refl_data_b/incidentPowb + (-scat_refl_data_t + scat_refl_data_l - scat_refl_data_r + scat_refl_data_dw - scat_refl_data_up)/incidentPow)
+
 abso=abs(abso_refl_data_b - abso_refl_data_t + abso_refl_data_l - abso_refl_data_r + abso_refl_data_dw - abso_refl_data_up)/incidentPow
 scat=abs(scat_refl_data_b - scat_refl_data_t + scat_refl_data_l - scat_refl_data_r + scat_refl_data_dw - scat_refl_data_up)/incidentPow
 
@@ -362,9 +364,34 @@ scat/=sph_area
 abso/=sph_area
 ext/=sph_area
 
+plt.figure()
+plt.plot(wl,scat,'o',label='scatering')
+plt.plot(wl,abso,'s',label='absorption')
+plt.plot(wl,ext,'^', label='extinction')
 
-norm=incidentPow/incidentPow.max()
-    
+#Analytical model
+x=c_coreshell(wl*1000,shapes.mat,shapes.mat,1,shapes.rad*1000,0,5)
+
+plt.plot(x[0:,0],x[0:,1], '-',label='Analytical model')
+plt.plot(x[0:,0],x[0:,2], '-')
+plt.plot(x[0:,0],x[0:,3], '-')
+
+radx=rad*1000
+plt.title('Efficiencies of Silver sphere of radius %inm' %radx)
+plt.xlabel("wavelength (um)")
+plt.ylabel("Efficiencies")
+plt.legend(loc="upper right")  
+#plt.axis([0.31, 0.7, 0, max(ext)*1.2])
+plt.grid(True)
+plt.minorticks_on()
+plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+
+norm = incidentPow/incidentPow.max()
+plt.figure()
+plt.plot(wl,incidentPow,'o',label='top')
+plt.plot(wl,incidentPowb,'o',label='bttm')
+plt.legend(loc="upper right")       
+'''   
 #saving simulation data in external file
 Fd_file = h5py.File('flux-sph/cross-sections-25nm.h5','w')
 Fd_file.create_dataset('wl',data=wl)
@@ -398,28 +425,8 @@ Fd_file.create_dataset('abso_t',data=abso_refl_data_t)
 Fd_file.create_dataset('abso_l',data=abso_refl_data_l)
 Fd_file.create_dataset('abso_r',data=abso_refl_data_r)
 Fd_file.close()
+'''
 
-plt.figure()
-plt.plot(wl,scat,'ob',label='scatering')
-plt.plot(wl,abso,'sr',label='absorption')
-plt.plot(wl,ext,'^g', label='extinction')
-
-#Analytical model
-x=c_coreshell(wl*1000,'Ag','Ag',1,rad*1000,0,5)
-
-plt.plot(x[0:,0],x[0:,1], '-k',label='Analytical model')
-plt.plot(x[0:,0],x[0:,2], '-k')
-plt.plot(x[0:,0],x[0:,3], '-k')
-
-radx=rad*1000
-plt.title('Efficiencies of Silver sphere of radius %inm' %radx)
-plt.xlabel("wavelength (um)")
-plt.ylabel("Efficiencies")
-plt.legend(loc="upper right")  
-plt.axis([0.31, 0.7, 0, max(ext)*1.2])
-plt.grid(True)
-plt.minorticks_on()
-plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
 
 '''
 ------------------------------
